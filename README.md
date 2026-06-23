@@ -33,10 +33,13 @@ When served locally, the pages auto-detect localhost/LAN and talk to the same-or
 
 The 3 pages are static (host on Vercel); the queue backend must run somewhere always-on (Render).
 
-### 1. Backend → Render
-1. Go to [render.com](https://render.com) → **New → Web Service** → connect this repo.
+### 1. Backend → Render (one click)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Ashiiq666/Management-token-System)
+
+1. Click the button above (sign in with GitHub the first time).
 2. Render reads `render.yaml` automatically (runtime: Python, start: `python server.py`).
-3. Deploy → copy the URL, e.g. `https://flydubai-complaint-queue.onrender.com`.
+3. Click **Apply / Deploy** → wait ~1 min → copy the URL, e.g. `https://flydubai-complaint-queue.onrender.com`.
 
 ### 2. Point the frontends at the backend
 In each of `form/index.html`, `admin-app/index.html`, `display-app/index.html`, set the
