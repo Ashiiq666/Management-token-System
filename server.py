@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(HERE, 'state.json')
-PORT = 8753
+PORT = int(os.environ.get('PORT', 8753))  # Render/Railway/Fly inject PORT
 LOCK = threading.Lock()
 DEFAULT_NAME = 'Fly Dubai'
 
@@ -209,8 +209,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def serve_static(self, path):
         if path in ('/', ''):
-            path = '/patient.html'
+            path = '/form/'  # default to the complaint form
         fp = os.path.normpath(os.path.join(HERE, path.lstrip('/')))
+        if os.path.isdir(fp):  # /form, /admin-app, /display-app -> their index.html
+            fp = os.path.join(fp, 'index.html')
         if not fp.startswith(HERE) or not os.path.isfile(fp):
             self.send_response(404); self.end_headers(); self.wfile.write(b'Not found'); return
         ctype = 'text/html; charset=utf-8' if fp.endswith('.html') else 'application/octet-stream'

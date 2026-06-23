@@ -351,7 +351,7 @@ input.inp::placeholder, textarea.inp::placeholder { color: var(--text-muted); }
 <script>
 const CONFIG = {
   hospitalName: "Fly Dubai",
-  hospitalTagline: "Your health, our priority",
+  hospitalTagline: "Complaint registration system",
   purposes: [
     { id: "it", label: "IT" },
     { id: "outlook", label: "Outlook Issue" },
@@ -363,6 +363,12 @@ const CONFIG = {
   broadcastChannel: "hospital-token-channel",
   adminPassword: "admin123"
 };
+
+/* ---- Backend API base ----
+   Local (served by server.py on your machine/Wi-Fi): same origin.
+   Hosted on Vercel: set this to your Render backend URL. */
+const API_BASE = (location.protocol === 'file:' || /^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname))
+  ? '' : 'https://REPLACE-WITH-YOUR-RENDER-URL.onrender.com';
 
 /* ---------- Theme ---------- */
 function initTheme() {
@@ -471,7 +477,7 @@ document.getElementById('regForm').addEventListener('submit', e => {
       feedbackType: ta.value.trim() ? 'complaint' : ''
     };
     try {
-      const res = await fetch('/api/register', {
+      const res = await fetch(API_BASE + '/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -535,7 +541,7 @@ document.getElementById('againLink').onclick = () => {
 };
 
 // Pull live hospital name from the shared server (falls back to CONFIG default)
-fetch('/api/state').then(r => r.json()).then(s => {
+fetch(API_BASE + '/api/state').then(r => r.json()).then(s => {
   if (s && s.hospitalName) document.getElementById('hospName').textContent = s.hospitalName;
 }).catch(() => {});
 </script>

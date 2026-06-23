@@ -152,6 +152,11 @@ const CONFIG = {
   storageKey: "hospitalTokenData",
   broadcastChannel: "hospital-token-channel"
 };
+
+/* ---- Backend API base ----
+   Local (served by server.py): same origin. Hosted on Vercel: set to your Render backend URL. */
+const API_BASE = (location.protocol === 'file:' || /^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname))
+  ? '' : 'https://REPLACE-WITH-YOUR-RENDER-URL.onrender.com';
 const channel = new BroadcastChannel(CONFIG.broadcastChannel);
 const purposeLabel = id => (CONFIG.purposes.find(p=>p.id===id)||{label:id}).label;
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -234,7 +239,7 @@ function resetIdle(){
 let lastSnapshot = '';
 async function poll(){
   try {
-    const r = await fetch('/api/state', { cache:'no-store' });
+    const r = await fetch(API_BASE + '/api/state', { cache:'no-store' });
     const txt = await r.text();
     if (txt !== lastSnapshot){ lastSnapshot = txt; render(JSON.parse(txt)); }
   } catch(e){ /* server unreachable — keep last view */ }

@@ -1,0 +1,2 @@
+# The backend uses only the Python standard library — no dependencies.
+# This file exists so Render/Railway detect a Python service.
