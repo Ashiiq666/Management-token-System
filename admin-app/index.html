@@ -367,8 +367,7 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp
 
 /* ---- Theme ---- */
 function initTheme() {
-  const saved = localStorage.getItem('theme');
-  setTheme(saved || 'light'); // default to light mode
+  setTheme('light'); // admin panel always opens in light mode
 }
 function setTheme(t) {
   document.documentElement.setAttribute('data-theme', t);
