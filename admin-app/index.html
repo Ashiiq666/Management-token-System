@@ -205,7 +205,7 @@ td .tok { font-weight: 800; color: var(--brand); }
     <div class="pin-logo"><i class="ti ti-lock"></i></div>
     <h2>Admin Access</h2>
     <p>Enter your PIN to continue</p>
-    <input class="pin-input" id="pinInput" type="password" inputmode="numeric" maxlength="12" placeholder="••••">
+    <input class="pin-input" id="pinInput" type="password" inputmode="text" autocapitalize="none" autocomplete="off" maxlength="12" placeholder="••••">
     <button class="pin-btn" id="pinBtn">Unlock</button>
     <div class="pin-err" id="pinErr"></div>
   </div>
@@ -353,7 +353,7 @@ const CONFIG = {
   ],
   storageKey: "hospitalTokenData",
   broadcastChannel: "hospital-token-channel",
-  adminPassword: "admin123"
+  adminPassword: "Amal123"
 };
 
 /* ---- Backend API base ----
@@ -367,8 +367,7 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp
 /* ---- Theme ---- */
 function initTheme() {
   const saved = localStorage.getItem('theme');
-  const sys = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  setTheme(saved || sys);
+  setTheme(saved || 'light'); // default to light mode
 }
 function setTheme(t) {
   document.documentElement.setAttribute('data-theme', t);

@@ -373,8 +373,7 @@ const API_BASE = (location.protocol === 'file:' || /^(localhost|127\.|192\.168\.
 /* ---------- Theme ---------- */
 function initTheme() {
   const saved = localStorage.getItem('theme');
-  const sys = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  setTheme(saved || sys);
+  setTheme(saved || 'light'); // default to light mode
 }
 function setTheme(t) {
   document.documentElement.setAttribute('data-theme', t);
