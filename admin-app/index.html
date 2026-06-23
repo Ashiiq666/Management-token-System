@@ -399,7 +399,7 @@ async function refresh(){
     applyName(state.hospitalName || CONFIG.hospitalName);
     if (document.getElementById('app').style.display !== 'none') render();
   } catch(e){
-    if (!serverDown) { serverDown = true; toast('⚠ Lost connection to server'); }
+    if (!serverDown) { serverDown = true; toast('⚠ Reconnecting to server…'); }
   }
 }
 async function op(name, extra){

@@ -475,20 +475,31 @@ document.getElementById('regForm').addEventListener('submit', e => {
       feedback: ta.value.trim(),
       feedbackType: ta.value.trim() ? 'complaint' : ''
     };
-    try {
+    // Try up to 3 times — the server may be waking from sleep (cold start ~30s)
+    const attempt = async () => {
       const res = await fetch(API_BASE + '/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error('bad response');
-      const data = await res.json();
-      showConfirm(data.token, data.ahead);
-    } catch (err) {
-      btn.disabled = false;
-      document.getElementById('submitLabel').innerHTML = '<i class="ti ti-ticket"></i> Get My Token';
-      alert('Could not reach the queue server. Make sure you are on the same Wi-Fi and try again.');
+      return res.json();
+    };
+    for (let i = 0; i < 3; i++) {
+      try {
+        const data = await attempt();
+        showConfirm(data.token, data.ahead);
+        return;
+      } catch (err) {
+        if (i < 2) {
+          document.getElementById('submitLabel').innerHTML = '<span class="spinner"></span> Connecting to server…';
+          await new Promise(r => setTimeout(r, 4000));
+        }
+      }
     }
+    btn.disabled = false;
+    document.getElementById('submitLabel').innerHTML = '<i class="ti ti-ticket"></i> Get My Token';
+    alert('Couldn’t reach the server. It may be waking up — please wait a moment and try again.');
   }, 600);
 });
 
