@@ -12,9 +12,12 @@ Then open from any device on the same Wi-Fi:
   http://<this-mac-ip>:8753/display.html
 """
 import json, os, threading
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
+
+# Dubai is UTC+4 year-round (no daylight saving), so a fixed offset is safe.
+DUBAI = timezone(timedelta(hours=4))
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(HERE, 'state.json')
@@ -24,11 +27,11 @@ DEFAULT_NAME = 'Fly Dubai'
 
 
 def today_str():
-    return datetime.now().strftime('%Y-%m-%d')
+    return datetime.now(DUBAI).strftime('%Y-%m-%d')
 
 
 def now_time():
-    return datetime.now().strftime('%I:%M %p').lstrip('0')
+    return datetime.now(DUBAI).strftime('%I:%M %p').lstrip('0')
 
 
 def fresh_state(name=DEFAULT_NAME):

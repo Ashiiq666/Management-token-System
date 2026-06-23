@@ -194,7 +194,6 @@ function render(s){
         stage.classList.remove('flash'); void stage.offsetWidth; stage.classList.add('flash');
       }
       pArea.innerHTML = `<div class="pname">${esc(t.name)}</div>
-        <div class="pmeta"><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span></div>
         <div class="proceed"><span class="dot"></span> Please proceed to counter</div>`;
     }
   } else {
@@ -211,7 +210,7 @@ function render(s){
     const t = s.tokens.find(x=>x.id===id);
     return `<div class="up-card ${i===0?'first':''}">
       <div class="up-num">${pad(t.id)}</div>
-      <div class="up-info"><div class="nm">${esc(t.name)}</div><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span></div>
+      <div class="up-info"><div class="nm">${esc(t.name)}</div></div>
     </div>`;
   }).join('');
 
