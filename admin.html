@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel — Fly Dubai</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root {
+  --brand: #0e7490; --brand-light: #e0f7fa; --brand-dark: #065b72;
+  --bg-page: #f0f4f8; --bg-card: #ffffff; --bg-input: #f8fafc;
+  --text-primary: #0f172a; --text-secondary: #64748b; --text-muted: #94a3b8;
+  --border: #e2e8f0; --border-focus: #0e7490;
+  --success: #15803d; --success-bg: #dcfce7; --warning: #d97706; --warning-bg: #fef3c7;
+  --danger: #dc2626; --danger-bg: #fee2e2; --pending: #7c3aed; --pending-bg: #ede9fe;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08); --shadow-md: 0 4px 16px rgba(0,0,0,0.10); --shadow-lg: 0 8px 32px rgba(14,116,144,0.12);
+  --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-xl: 20px;
+}
+[data-theme="dark"] {
+  --brand: #22d3ee; --brand-light: #0c2d38; --brand-dark: #67e8f9;
+  --bg-page: #0f172a; --bg-card: #1e293b; --bg-input: #162032;
+  --text-primary: #f1f5f9; --text-secondary: #94a3b8; --text-muted: #64748b;
+  --border: #2d3f55; --border-focus: #22d3ee;
+  --success: #4ade80; --success-bg: #14532d; --warning: #fbbf24; --warning-bg: #451a03;
+  --danger: #f87171; --danger-bg: #450a0a; --pending: #a78bfa; --pending-bg: #2e1065;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3); --shadow-md: 0 4px 16px rgba(0,0,0,0.4); --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-page); color: var(--text-primary); -webkit-font-smoothing: antialiased; transition: background .3s, color .3s; }
+button { font-family: inherit; cursor: pointer; }
+
+/* PIN LOCK */
+#pinLock { position: fixed; inset: 0; background: var(--bg-page); z-index: 100; display: flex; align-items: center; justify-content: center; }
+.pin-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 38px 34px; width: 340px; text-align: center; }
+.pin-logo { width: 60px; height: 60px; border-radius: 50%; background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 16px; }
+[data-theme="dark"] .pin-logo { color:#04141a; }
+.pin-card h2 { font-size: 19px; font-weight: 800; }
+.pin-card p { font-size: 13px; color: var(--text-secondary); margin: 4px 0 22px; }
+.pin-input { width: 100%; height: 52px; text-align: center; letter-spacing: 8px; font-size: 22px; font-weight: 700; border: 1.5px solid var(--border); background: var(--bg-input); color: var(--text-primary); border-radius: var(--radius-md); }
+.pin-input:focus { outline: none; border-color: var(--brand); }
+.pin-btn { width: 100%; height: 50px; margin-top: 14px; border: none; border-radius: var(--radius-md); background: var(--brand); color: #fff; font-size: 15px; font-weight: 700; }
+[data-theme="dark"] .pin-btn { color:#04141a; }
+.pin-err { color: var(--danger); font-size: 13px; margin-top: 12px; min-height: 18px; font-weight: 600; }
+
+/* LAYOUT */
+.app { display: flex; min-height: 100vh; }
+.sidebar { width: 240px; background: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; flex-shrink: 0; }
+.sb-head { padding: 22px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 11px; }
+.sb-logo { width: 42px; height: 42px; border-radius: 50%; background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+[data-theme="dark"] .sb-logo { color:#04141a; }
+.sb-head h1 { font-size: 15px; font-weight: 800; line-height: 1.2; }
+.sb-head p { font-size: 11px; color: var(--text-secondary); }
+.sb-clock { padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.sb-clock .d { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+.sb-clock .t { font-size: 22px; font-weight: 800; color: var(--brand); font-variant-numeric: tabular-nums; }
+nav { flex: 1; padding: 14px 12px; }
+.nav-item { display: flex; align-items: center; gap: 11px; padding: 12px 14px; border-radius: var(--radius-md); font-size: 14px; font-weight: 600; color: var(--text-secondary); cursor: pointer; margin-bottom: 4px; transition: background .15s, color .15s; }
+.nav-item i { font-size: 20px; }
+.nav-item:hover { background: var(--bg-input); }
+.nav-item.active { background: var(--brand-light); color: var(--brand); }
+.nav-badge { margin-left: auto; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+.sb-foot { padding: 14px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
+.sb-foot button { flex: 1; height: 42px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-primary); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; }
+
+.main { flex: 1; padding: 26px 30px; min-width: 0; }
+.page-title { font-size: 23px; font-weight: 800; margin-bottom: 4px; }
+.page-sub { font-size: 13.5px; color: var(--text-secondary); margin-bottom: 22px; }
+.tab { display: none; }
+.tab.active { display: block; }
+
+/* Metric cards */
+.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 22px; }
+.metric { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px; box-shadow: var(--shadow-sm); }
+.metric .ic { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 12px; }
+.metric .num { font-size: 30px; font-weight: 800; line-height: 1; }
+.metric .lbl { font-size: 13px; color: var(--text-secondary); font-weight: 600; margin-top: 5px; }
+.ic.b1 { background: var(--brand-light); color: var(--brand); }
+.ic.b2 { background: var(--warning-bg); color: var(--warning); }
+.ic.b3 { background: var(--success-bg); color: var(--success); }
+.ic.b4 { background: var(--pending-bg); color: var(--pending); }
+
+/* Current token card */
+.current-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 22px; box-shadow: var(--shadow-sm); margin-bottom: 18px; display: flex; align-items: center; gap: 26px; flex-wrap: wrap; }
+.cur-num-box { text-align: center; min-width: 150px; }
+.cur-num-box .lbl { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; }
+.cur-num { font-size: 64px; font-weight: 900; color: var(--brand); line-height: 1; }
+.cur-num.flash { animation: tokenFlash .6s; }
+.cur-info { flex: 1; min-width: 200px; }
+.cur-info h3 { font-size: 20px; font-weight: 800; }
+.cur-info .meta { font-size: 13.5px; color: var(--text-secondary); margin-top: 4px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.cur-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn { border: none; border-radius: var(--radius-md); padding: 12px 18px; font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 7px; transition: opacity .15s, transform .1s; }
+.btn:active { transform: scale(.97); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-skip { background: var(--warning-bg); color: var(--warning); }
+.btn-ghost { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); }
+[data-theme="dark"] .btn-success { color: #04140a; }
+
+.call-next { width: 100%; height: 64px; border: none; border-radius: var(--radius-lg); background: var(--brand); color: #fff; font-size: 18px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 12px; box-shadow: var(--shadow-md); margin-bottom: 22px; transition: transform .1s, opacity .15s; }
+[data-theme="dark"] .call-next { color: #04141a; }
+.call-next:active { transform: scale(.99); }
+.call-next:disabled { opacity: .5; }
+
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+.panel-head { padding: 16px 18px; border-bottom: 1px solid var(--border); font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.panel-head .cnt { background: var(--bg-input); color: var(--text-secondary); font-size: 12px; padding: 2px 9px; border-radius: 999px; font-weight: 700; }
+.panel-body { padding: 12px; max-height: 460px; overflow-y: auto; }
+.q-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border); margin-bottom: 8px; background: var(--bg-input); }
+.q-item.upnext { border-color: var(--brand); background: var(--brand-light); }
+.q-tok { font-size: 20px; font-weight: 800; color: var(--brand); min-width: 38px; }
+.q-mid { flex: 1; min-width: 0; }
+.q-mid .nm { font-size: 14.5px; font-weight: 700; }
+.q-mid .sub { font-size: 12px; color: var(--text-secondary); display: flex; gap: 8px; align-items: center; margin-top: 2px; flex-wrap: wrap; }
+.q-item .btn { padding: 8px 12px; font-size: 12.5px; }
+.upnext-tag { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: var(--brand); text-transform: uppercase; }
+.empty { text-align: center; color: var(--text-muted); padding: 30px 10px; font-size: 13.5px; }
+.empty i { font-size: 30px; display: block; margin-bottom: 8px; opacity: .6; }
+
+/* badges */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }
+.badge.it { background: var(--brand-light); color: var(--brand); }
+.badge.outlook { background: var(--success-bg); color: var(--success); }
+.badge.hardware { background: var(--warning-bg); color: var(--warning); }
+.badge.laptop { background: var(--pending-bg); color: var(--pending); }
+.badge.other { background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border); }
+.st { display: inline-flex; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }
+.st.waiting { background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border); }
+.st.serving { background: var(--brand-light); color: var(--brand); }
+.st.pending { background: var(--warning-bg); color: var(--warning); }
+.st.done { background: var(--success-bg); color: var(--success); }
+
+/* Table */
+.toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.toolbar input, .toolbar select { height: 42px; padding: 0 12px; border: 1.5px solid var(--border); background: var(--bg-input); color: var(--text-primary); border-radius: var(--radius-md); font-size: 14px; font-family: inherit; }
+.toolbar input { flex: 1; min-width: 180px; }
+.toolbar input:focus, .toolbar select:focus { outline: none; border-color: var(--brand); }
+table { width: 100%; border-collapse: collapse; background: var(--bg-card); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); }
+th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-secondary); padding: 13px 16px; border-bottom: 1px solid var(--border); background: var(--bg-input); }
+td { padding: 13px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+tr:last-child td { border-bottom: none; }
+td .tok { font-weight: 800; color: var(--brand); }
+
+/* Feedback */
+.fb-section { margin-bottom: 26px; }
+.fb-shead { padding: 12px 16px; border-radius: var(--radius-md); font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.fb-shead.green { background: var(--success-bg); color: var(--success); }
+.fb-shead.red { background: var(--danger-bg); color: var(--danger); }
+.fb-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 10px; }
+.fb-card.unreviewed { border-left: 4px solid var(--warning); }
+.fb-card .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; flex-wrap: wrap; gap: 8px; }
+.fb-card .who { font-size: 13.5px; font-weight: 700; }
+.fb-card .who span { color: var(--text-secondary); font-weight: 500; }
+.fb-card .msg { font-size: 14px; color: var(--text-primary); line-height: 1.55; }
+.fb-card .foot { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; }
+.fb-card .tm { font-size: 12px; color: var(--text-muted); }
+
+/* Settings */
+.settings-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 22px; box-shadow: var(--shadow-sm); margin-bottom: 18px; max-width: 560px; }
+.settings-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.settings-card p { font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; }
+.settings-card input[type=text] { width: 100%; height: 46px; padding: 0 14px; border: 1.5px solid var(--border); background: var(--bg-input); color: var(--text-primary); border-radius: var(--radius-md); font-size: 14px; font-family: inherit; margin-bottom: 12px; }
+.settings-card input:focus { outline: none; border-color: var(--brand); }
+#qrcode { display: flex; justify-content: center; padding: 16px; background: #fff; border-radius: var(--radius-md); margin-top: 12px; width: fit-content; }
+
+.theme-btn { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-primary); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+.top-actions { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+
+/* Modal */
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 90; display: none; align-items: center; justify-content: center; padding: 20px; }
+.modal-bg.show { display: flex; }
+.modal { background: var(--bg-card); border-radius: var(--radius-lg); padding: 24px; width: 360px; max-width: 100%; box-shadow: var(--shadow-lg); }
+.modal h3 { font-size: 17px; font-weight: 800; margin-bottom: 6px; }
+.modal p { font-size: 13.5px; color: var(--text-secondary); margin-bottom: 18px; }
+.modal-actions { display: flex; gap: 10px; }
+.modal-actions .btn { flex: 1; justify-content: center; }
+.btn-danger { background: var(--danger); color: #fff; }
+.reinsert-opts { display: grid; gap: 8px; }
+.reinsert-opts button { text-align: left; padding: 12px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-primary); border-radius: var(--radius-md); font-size: 14px; font-weight: 600; }
+.reinsert-opts button:hover { border-color: var(--brand); }
+
+@keyframes tokenFlash { 0% { background: rgba(34,211,238,0.15); } 100% { background: transparent; } }
+@media (max-width: 860px) {
+  .metrics { grid-template-columns: repeat(2,1fr); }
+  .cols { grid-template-columns: 1fr; }
+  .sidebar { position: fixed; left: -240px; z-index: 80; transition: left .25s; }
+  .sidebar.open { left: 0; box-shadow: var(--shadow-lg); }
+  .mobile-bar { display: flex !important; }
+}
+.mobile-bar { display: none; align-items: center; gap: 12px; margin-bottom: 14px; }
+.mobile-bar button { width: 44px; height: 44px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); border-radius: var(--radius-md); font-size: 22px; display: flex; align-items: center; justify-content: center; }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text-primary); color: var(--bg-card); padding: 12px 20px; border-radius: var(--radius-md); font-size: 14px; font-weight: 600; box-shadow: var(--shadow-lg); z-index: 95; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+</style>
+</head>
+<body>
+
+<!-- PIN LOCK -->
+<div id="pinLock">
+  <div class="pin-card">
+    <div class="pin-logo"><i class="ti ti-lock"></i></div>
+    <h2>Admin Access</h2>
+    <p>Enter your PIN to continue</p>
+    <input class="pin-input" id="pinInput" type="password" inputmode="numeric" maxlength="12" placeholder="••••">
+    <button class="pin-btn" id="pinBtn">Unlock</button>
+    <div class="pin-err" id="pinErr"></div>
+  </div>
+</div>
+
+<div class="app" id="app" style="display:none">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-head">
+      <div class="sb-logo"><i class="ti ti-plane-tilt"></i></div>
+      <div><h1 id="sbName">Fly Dubai</h1><p>Admin Panel</p></div>
+    </div>
+    <div class="sb-clock"><div class="d" id="sbDate">—</div><div class="t" id="sbClock">--:--:--</div></div>
+    <nav id="nav">
+      <div class="nav-item active" data-tab="dashboard"><i class="ti ti-layout-dashboard"></i> Dashboard</div>
+      <div class="nav-item" data-tab="registrations"><i class="ti ti-users"></i> Registrations</div>
+      <div class="nav-item" data-tab="feedback"><i class="ti ti-message-2"></i> Feedback <span class="nav-badge" id="fbBadge" style="display:none">0</span></div>
+      <div class="nav-item" data-tab="settings"><i class="ti ti-settings"></i> Settings</div>
+    </nav>
+    <div class="sb-foot">
+      <button id="themeBtn"><i class="ti ti-moon"></i> Theme</button>
+      <button id="displayLink" title="Open TV Display"><i class="ti ti-device-tv"></i> TV</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="mobile-bar">
+      <button id="menuBtn"><i class="ti ti-menu-2"></i></button>
+      <strong id="mobileTitle">Dashboard</strong>
+    </div>
+
+    <!-- DASHBOARD -->
+    <section class="tab active" id="tab-dashboard">
+      <div class="page-title">Dashboard</div>
+      <div class="page-sub">Manage the live token queue.</div>
+      <div class="metrics">
+        <div class="metric"><div class="ic b1"><i class="ti ti-ticket"></i></div><div class="num" id="mTotal">0</div><div class="lbl">Total Today</div></div>
+        <div class="metric"><div class="ic b2"><i class="ti ti-clock"></i></div><div class="num" id="mWaiting">0</div><div class="lbl">Waiting</div></div>
+        <div class="metric"><div class="ic b3"><i class="ti ti-user-check"></i></div><div class="num" id="mServing">0</div><div class="lbl">Serving Now</div></div>
+        <div class="metric"><div class="ic b4"><i class="ti ti-checks"></i></div><div class="num" id="mDone">0</div><div class="lbl">Completed</div></div>
+      </div>
+
+      <div class="current-card" id="currentCard">
+        <div class="cur-num-box"><div class="lbl">Now Serving</div><div class="cur-num" id="curNum">—</div></div>
+        <div class="cur-info" id="curInfo"><h3>No token being served</h3><div class="meta">Press "Call Next Token" to begin.</div></div>
+        <div class="cur-actions" id="curActions"></div>
+      </div>
+
+      <button class="call-next" id="callNextBtn"><i class="ti ti-player-play-filled"></i> Call Next Token</button>
+
+      <div class="cols">
+        <div class="panel">
+          <div class="panel-head"><span><i class="ti ti-clock-hour-4"></i> Waiting Queue</span><span class="cnt" id="qCount">0</span></div>
+          <div class="panel-body" id="queueBody"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><span><i class="ti ti-player-skip-forward"></i> Pending (Skipped)</span><span class="cnt" id="pCount">0</span></div>
+          <div class="panel-body" id="pendingBody"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- REGISTRATIONS -->
+    <section class="tab" id="tab-registrations">
+      <div class="page-title">Registrations</div>
+      <div class="page-sub">All patients registered today.</div>
+      <div class="toolbar">
+        <input id="searchInp" type="text" placeholder="Search by name or phone...">
+        <select id="filterPurpose"><option value="">All purposes</option></select>
+        <select id="filterStatus">
+          <option value="">All statuses</option>
+          <option value="waiting">Waiting</option>
+          <option value="serving">Serving</option>
+          <option value="pending">Pending</option>
+          <option value="done">Done</option>
+        </select>
+        <button class="btn btn-ghost" id="exportBtn"><i class="ti ti-download"></i> Export CSV</button>
+      </div>
+      <table>
+        <thead><tr><th>Token</th><th>Name</th><th>Phone</th><th>Purpose</th><th>Status</th><th>Registered</th></tr></thead>
+        <tbody id="regBody"></tbody>
+      </table>
+    </section>
+
+    <!-- FEEDBACK -->
+    <section class="tab" id="tab-feedback">
+      <div class="page-title">Feedback &amp; Complaints</div>
+      <div class="page-sub">Patient-submitted messages.</div>
+      <div class="fb-section">
+        <div class="fb-shead green"><i class="ti ti-message-heart"></i> Feedback</div>
+        <div id="feedbackList"></div>
+      </div>
+      <div class="fb-section">
+        <div class="fb-shead red"><i class="ti ti-alert-triangle"></i> Complaints</div>
+        <div id="complaintList"></div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="tab" id="tab-settings">
+      <div class="page-title">Settings</div>
+      <div class="page-sub">Configure the system.</div>
+      <div class="settings-card">
+        <h3>Hospital Name</h3>
+        <p>Displayed across all screens.</p>
+        <input type="text" id="setName">
+        <button class="btn btn-success" id="saveNameBtn"><i class="ti ti-check"></i> Save Name</button>
+      </div>
+      <div class="settings-card">
+        <h3>QR Code Generator</h3>
+        <p>Enter the patient form URL. Patients scan this to register.</p>
+        <input type="text" id="qrUrl" placeholder="https://hospital-patient.netlify.app">
+        <button class="btn btn-ghost" id="genQrBtn"><i class="ti ti-qrcode"></i> Generate QR</button>
+        <div id="qrcode"></div>
+      </div>
+      <div class="settings-card">
+        <h3>Daily Report</h3>
+        <p>Print a summary of today's activity.</p>
+        <button class="btn btn-ghost" id="printBtn"><i class="ti ti-printer"></i> Print Today's Report</button>
+      </div>
+      <div class="settings-card">
+        <h3 style="color:var(--danger)">Danger Zone</h3>
+        <p>Clear all of today's tokens and start fresh.</p>
+        <button class="btn btn-danger" id="resetBtn"><i class="ti ti-trash"></i> Reset Today's Data</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- MODAL -->
+<div class="modal-bg" id="modalBg"><div class="modal" id="modalContent"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CONFIG = {
+  hospitalName: "Fly Dubai",
+  hospitalTagline: "Your health, our priority",
+  purposes: [
+    { id: "it", label: "IT" },
+    { id: "outlook", label: "Outlook Issue" },
+    { id: "hardware", label: "Hardware Issues" },
+    { id: "laptop", label: "Laptop Issues" },
+    { id: "other", label: "Other Issues" }
+  ],
+  storageKey: "hospitalTokenData",
+  broadcastChannel: "hospital-token-channel",
+  adminPassword: "admin123"
+};
+const channel = new BroadcastChannel(CONFIG.broadcastChannel);
+const purposeLabel = id => (CONFIG.purposes.find(p => p.id === id) || {label:id}).label;
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---- Theme ---- */
+function initTheme() {
+  const saved = localStorage.getItem('theme');
+  const sys = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  setTheme(saved || sys);
+}
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('theme', t);
+  const i = document.querySelector('#themeBtn i'); if (i) i.className = t==='dark'?'ti ti-sun':'ti ti-moon';
+}
+initTheme();
+document.getElementById('themeBtn').onclick = () =>
+  setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');
+
+/* ---- Clock ---- */
+function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function fmtTime(d){ let h=d.getHours(),m=d.getMinutes(); const ap=h>=12?'PM':'AM'; h=h%12||12; return `${h}:${String(m).padStart(2,'0')} ${ap}`; }
+function tick(){
+  const d=new Date();
+  document.getElementById('sbClock').textContent = d.toLocaleTimeString('en-US',{hour12:true});
+  document.getElementById('sbDate').textContent = d.toLocaleDateString('en-US',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+}
+tick(); setInterval(tick,1000);
+
+/* ---- State (shared server) ---- */
+let state = null;           // authoritative state fetched from the server
+let serverDown = false;
+async function refresh(){
+  try {
+    const r = await fetch('/api/state', { cache: 'no-store' });
+    state = await r.json();
+    serverDown = false;
+    applyName(state.hospitalName || CONFIG.hospitalName);
+    if (document.getElementById('app').style.display !== 'none') render();
+  } catch(e){
+    if (!serverDown) { serverDown = true; toast('⚠ Lost connection to server'); }
+  }
+}
+async function op(name, extra){
+  try {
+    const r = await fetch('/api/op', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(Object.assign({ op:name }, extra||{}))
+    });
+    state = await r.json();
+    applyName(state.hospitalName || CONFIG.hospitalName);
+    render();
+    return true;
+  } catch(e){ toast('⚠ Action failed — check server'); return false; }
+}
+
+/* ---- PIN ---- */
+const pinLock = document.getElementById('pinLock');
+function unlock(){ pinLock.style.display='none'; document.getElementById('app').style.display='flex'; boot(); }
+if (sessionStorage.getItem('adminUnlocked')==='1') unlock();
+document.getElementById('pinBtn').onclick = tryPin;
+document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key==='Enter') tryPin(); });
+document.getElementById('pinInput').focus();
+function tryPin(){
+  const v = document.getElementById('pinInput').value;
+  if (v === CONFIG.adminPassword) { sessionStorage.setItem('adminUnlocked','1'); unlock(); }
+  else { document.getElementById('pinErr').textContent='Incorrect PIN. Try again.'; document.getElementById('pinInput').value=''; document.getElementById('pinInput').focus(); }
+}
+
+/* ---- Sound (Web Audio 3-tone chime) ---- */
+let audioCtx;
+function chime(){
+  try {
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const notes = [523.25, 659.25, 783.99]; // C5 E5 G5
+    notes.forEach((f,i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type='sine'; o.frequency.value=f; o.connect(g); g.connect(audioCtx.destination);
+      const t = audioCtx.currentTime + i*0.18;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.25, t+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t+0.32);
+      o.start(t); o.stop(t+0.34);
+    });
+  } catch(e){}
+}
+
+/* ---- Boot ---- */
+async function boot(){
+  buildPurposeFilter();
+  await refresh();
+  if (state) document.getElementById('setName').value = state.hospitalName || CONFIG.hospitalName;
+  render();
+  setInterval(refresh, 1500); // live sync with phones / TV
+}
+function applyName(name){
+  CONFIG.hospitalName = name;
+  document.getElementById('sbName').textContent = name.split(' ').slice(0,2).join(' ');
+}
+
+/* ---- Navigation ---- */
+document.querySelectorAll('.nav-item').forEach(it => {
+  it.onclick = () => {
+    document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+    it.classList.add('active');
+    const tab = it.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.getElementById('tab-'+tab).classList.add('active');
+    document.getElementById('mobileTitle').textContent = it.textContent.trim();
+    document.getElementById('sidebar').classList.remove('open');
+  };
+});
+document.getElementById('menuBtn').onclick = () => document.getElementById('sidebar').classList.toggle('open');
+document.getElementById('displayLink').onclick = () => window.open('display.html','_blank');
+
+/* ---- Queue actions (all server-side) ---- */
+document.getElementById('callNextBtn').onclick = async () => {
+  if (!state) return;
+  const hadQueue = state.queue.length > 0;
+  const ok = await op('call-next');
+  if (!ok) return;
+  if (state.currentToken != null) { chime(); flashCurrent(); toast('Now serving token ' + String(state.currentToken).padStart(2,'0')); }
+  else toast(hadQueue ? 'Queue is empty' : 'No one waiting');
+};
+async function markDone(){ if (await op('mark-done')) toast('Marked as done'); }
+async function skipCurrent(){ if (await op('skip-current')) toast('Token moved to pending'); }
+async function skipQueued(id){ if (await op('skip-queued', { id })) toast('Skipped to pending'); }
+
+/* ---- Re-insert ---- */
+function openReinsert(id){
+  const html = `
+    <h3>Re-insert Token ${String(id).padStart(2,'0')}</h3>
+    <p>Choose where to place this token back in the queue.</p>
+    <div class="reinsert-opts">
+      <button data-mode="next"><i class="ti ti-arrow-bar-up"></i> As next (front of queue)</button>
+      <button data-mode="after"><i class="ti ti-arrow-down"></i> After current serving</button>
+      <button data-mode="end"><i class="ti ti-arrow-bar-down"></i> At the end</button>
+      <button data-mode="pos"><i class="ti ti-list-numbers"></i> At specific position…</button>
+    </div>
+    <div class="modal-actions" style="margin-top:16px"><button class="btn btn-ghost" id="cancelModal" style="flex:1;justify-content:center">Cancel</button></div>`;
+  showModal(html);
+  document.getElementById('cancelModal').onclick = closeModal;
+  document.querySelectorAll('.reinsert-opts button').forEach(b => {
+    b.onclick = () => reinsert(id, b.dataset.mode);
+  });
+}
+async function reinsert(id, mode){
+  let pos = null;
+  if (mode==='pos'){
+    const max = (state ? state.queue.length : 0) + 1;
+    pos = parseInt(prompt(`Position (1–${max}):`, '1'), 10);
+    if (isNaN(pos)) return;
+  }
+  closeModal();
+  if (await op('reinsert', { id, mode, pos })) toast('Token re-inserted');
+}
+
+/* ---- Render ---- */
+function flashCurrent(){ const el=document.getElementById('curNum'); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+function render(){
+  const s = state;
+  if (!s) return;
+  const waiting = s.tokens.filter(t=>t.status==='waiting').length;
+  const serving = s.tokens.filter(t=>t.status==='serving').length;
+  const done = s.tokens.filter(t=>t.status==='done').length;
+  document.getElementById('mTotal').textContent = s.tokens.length;
+  document.getElementById('mWaiting').textContent = waiting;
+  document.getElementById('mServing').textContent = serving;
+  document.getElementById('mDone').textContent = done;
+
+  // current
+  const curNum = document.getElementById('curNum'), curInfo=document.getElementById('curInfo'), curActions=document.getElementById('curActions');
+  if (s.currentToken!=null){
+    const t = s.tokens.find(x=>x.id===s.currentToken);
+    curNum.textContent = String(t.id).padStart(2,'0');
+    curInfo.innerHTML = `<h3>${esc(t.name)}</h3><div class="meta"><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span><span><i class="ti ti-clock"></i> Called ${t.calledAt||''}</span></div>`;
+    curActions.innerHTML = `<button class="btn btn-success" onclick="markDone()"><i class="ti ti-check"></i> Mark Done</button><button class="btn btn-skip" onclick="skipCurrent()"><i class="ti ti-player-skip-forward"></i> Skip</button>`;
+  } else {
+    curNum.textContent='—';
+    curInfo.innerHTML = `<h3>No token being served</h3><div class="meta">Press "Call Next Token" to begin.</div>`;
+    curActions.innerHTML='';
+  }
+
+  // queue (server already orders emergencies first)
+  document.getElementById('qCount').textContent = s.queue.length;
+  const qb = document.getElementById('queueBody');
+  if (!s.queue.length) qb.innerHTML = `<div class="empty"><i class="ti ti-inbox"></i>No one waiting</div>`;
+  else qb.innerHTML = s.queue.map((id,i)=>{
+    const t = s.tokens.find(x=>x.id===id);
+    return `<div class="q-item ${i===0?'upnext':''}">
+      <div class="q-tok">${String(t.id).padStart(2,'0')}</div>
+      <div class="q-mid"><div class="nm">${esc(t.name)} ${i===0?'<span class="upnext-tag">• up next</span>':''}</div>
+        <div class="sub"><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span><span>${t.registeredAt}</span></div></div>
+      <button class="btn btn-skip" onclick="skipQueued(${t.id})"><i class="ti ti-player-skip-forward"></i></button>
+    </div>`;
+  }).join('');
+
+  // pending
+  document.getElementById('pCount').textContent = s.pending.length;
+  const pb = document.getElementById('pendingBody');
+  if (!s.pending.length) pb.innerHTML = `<div class="empty"><i class="ti ti-player-skip-forward"></i>No skipped tokens</div>`;
+  else pb.innerHTML = s.pending.map(id=>{
+    const t = s.tokens.find(x=>x.id===id);
+    return `<div class="q-item">
+      <div class="q-tok">${String(t.id).padStart(2,'0')}</div>
+      <div class="q-mid"><div class="nm">${esc(t.name)}</div>
+        <div class="sub"><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span></div></div>
+      <button class="btn btn-ghost" onclick="openReinsert(${t.id})"><i class="ti ti-arrow-back-up"></i> Re-insert</button>
+    </div>`;
+  }).join('');
+
+  renderTable();
+  renderFeedback();
+}
+
+/* ---- Table ---- */
+function buildPurposeFilter(){
+  const sel = document.getElementById('filterPurpose');
+  CONFIG.purposes.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.label; sel.appendChild(o); });
+}
+function renderTable(){
+  const s = state;
+  if (!s) return;
+  const q = document.getElementById('searchInp').value.toLowerCase().trim();
+  const fp = document.getElementById('filterPurpose').value;
+  const fs = document.getElementById('filterStatus').value;
+  let rows = s.tokens.filter(t=>{
+    if (q && !(t.name.toLowerCase().includes(q) || t.phone.includes(q))) return false;
+    if (fp && t.purpose!==fp) return false;
+    if (fs && t.status!==fs) return false;
+    return true;
+  });
+  const tb = document.getElementById('regBody');
+  if (!rows.length){ tb.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:30px">No matching registrations</td></tr>`; return; }
+  tb.innerHTML = rows.map(t=>`<tr>
+    <td><span class="tok">${String(t.id).padStart(2,'0')}</span></td>
+    <td>${esc(t.name)}</td><td>${t.phone}</td>
+    <td><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span></td>
+    <td><span class="st ${t.status}">${t.status}</span></td>
+    <td>${t.registeredAt}</td></tr>`).join('');
+}
+['searchInp','filterPurpose','filterStatus'].forEach(id=>document.getElementById(id).addEventListener('input', renderTable));
+
+/* ---- Feedback ---- */
+function renderFeedback(){
+  const s = state;
+  if (!s) return;
+  const fbs = s.tokens.filter(t=>t.feedbackType==='feedback' && t.feedback);
+  const cps = s.tokens.filter(t=>t.feedbackType==='complaint' && t.feedback);
+  const unreviewed = s.tokens.filter(t=>t.feedback && !t.reviewed).length;
+  const badge = document.getElementById('fbBadge');
+  if (unreviewed){ badge.style.display='inline-block'; badge.textContent=unreviewed; } else badge.style.display='none';
+
+  document.getElementById('feedbackList').innerHTML = fbs.length ? fbs.map(fbCard).join('') : emptyFb('No feedback yet');
+  document.getElementById('complaintList').innerHTML = cps.length ? cps.map(fbCard).join('') : emptyFb('No complaints');
+}
+function emptyFb(msg){ return `<div class="empty" style="padding:20px"><i class="ti ti-mail-off"></i>${msg}</div>`; }
+function fbCard(t){
+  return `<div class="fb-card ${t.reviewed?'':'unreviewed'}">
+    <div class="top"><div class="who">Token ${String(t.id).padStart(2,'0')} — ${esc(t.name)} <span>· ${t.phone}</span></div>
+      <span class="st ${t.feedbackType==='complaint'?'pending':'done'}">${t.feedbackType}</span></div>
+    <div class="msg">${esc(t.feedback)}</div>
+    <div class="foot"><span class="tm"><i class="ti ti-clock"></i> ${t.registeredAt}</span>
+      ${t.reviewed ? '<span class="st done"><i class="ti ti-check"></i> Reviewed</span>' : `<button class="btn btn-ghost" onclick="markReviewed(${t.id})"><i class="ti ti-eye-check"></i> Mark reviewed</button>`}</div>
+  </div>`;
+}
+async function markReviewed(id){ await op('mark-reviewed', { id }); }
+
+/* ---- Settings ---- */
+document.getElementById('saveNameBtn').onclick = async () => {
+  const v = document.getElementById('setName').value.trim();
+  if (!v) return;
+  if (await op('set-name', { name: v })) toast('Hospital name saved');
+};
+let qrObj;
+document.getElementById('genQrBtn').onclick = () => {
+  const url = document.getElementById('qrUrl').value.trim() || (location.href.replace('admin.html','patient.html'));
+  const box = document.getElementById('qrcode'); box.innerHTML='';
+  qrObj = new QRCode(box, { text: url, width: 200, height: 200, colorDark:'#0e7490', colorLight:'#ffffff' });
+};
+document.getElementById('printBtn').onclick = () => printReport();
+document.getElementById('resetBtn').onclick = () => {
+  showModal(`<h3>Reset today's data?</h3><p>This permanently deletes all tokens, queue, and feedback for today. This cannot be undone.</p>
+    <div class="modal-actions"><button class="btn btn-ghost" id="rc">Cancel</button><button class="btn btn-danger" id="rok"><i class="ti ti-trash"></i> Reset</button></div>`);
+  document.getElementById('rc').onclick = closeModal;
+  document.getElementById('rok').onclick = async () => { await op('reset'); closeModal(); toast('Data reset'); };
+};
+document.getElementById('exportBtn').onclick = () => exportCSV();
+
+function exportCSV(){
+  const s = state; if (!s) return;
+  const head = ['Token','Name','Phone','Purpose','Status','Registered','FeedbackType','Feedback'];
+  const rows = s.tokens.map(t=>[t.id,t.name,t.phone,t.purpose,t.status,t.registeredAt,t.feedbackType||'',(t.feedback||'').replace(/\n/g,' ')]);
+  const csv = [head, ...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'}); const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=`tokens-${todayStr()}.csv`; a.click();
+  toast('CSV exported');
+}
+function printReport(){
+  const s = state; if (!s) return;
+  const done = s.tokens.filter(t=>t.status==='done').length;
+  const w = window.open('','_blank');
+  w.document.write(`<html><head><title>Report ${todayStr()}</title>
+    <style>body{font-family:Inter,Arial,sans-serif;padding:30px;color:#0f172a}h1{color:#0e7490}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #e2e8f0;padding:8px;text-align:left;font-size:13px}th{background:#f0f4f8}.s{display:flex;gap:24px;margin:16px 0}.s div{font-size:14px}</style></head><body>
+    <h1>${esc(CONFIG.hospitalName)}</h1><p><strong>Daily Token Report</strong> — ${new Date().toDateString()}</p>
+    <div class="s"><div>Total: <strong>${s.tokens.length}</strong></div><div>Completed: <strong>${done}</strong></div><div>Pending: <strong>${s.pending.length}</strong></div></div>
+    <table><thead><tr><th>Token</th><th>Name</th><th>Phone</th><th>Purpose</th><th>Status</th><th>Registered</th></tr></thead><tbody>
+    ${s.tokens.map(t=>`<tr><td>${String(t.id).padStart(2,'0')}</td><td>${esc(t.name)}</td><td>${t.phone}</td><td>${purposeLabel(t.purpose)}</td><td>${t.status}</td><td>${t.registeredAt}</td></tr>`).join('')}
+    </tbody></table></body></html>`);
+  w.document.close(); w.focus(); setTimeout(()=>w.print(), 300);
+}
+
+/* ---- Modal/toast ---- */
+function showModal(html){ document.getElementById('modalContent').innerHTML=html; document.getElementById('modalBg').classList.add('show'); }
+function closeModal(){ document.getElementById('modalBg').classList.remove('show'); }
+document.getElementById('modalBg').addEventListener('click', e=>{ if(e.target.id==='modalBg') closeModal(); });
+let toastTimer;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* Live sync is handled by polling /api/state in boot() */
+</script>
+</body>
+</html>

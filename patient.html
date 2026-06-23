@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0e7490" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Complaint Registration — Fly Dubai</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+:root {
+  --brand: #0e7490;
+  --brand-light: #e0f7fa;
+  --brand-dark: #065b72;
+  --bg-page: #f0f4f8;
+  --bg-card: #ffffff;
+  --bg-input: #f8fafc;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --border: #e2e8f0;
+  --border-focus: #0e7490;
+  --success: #15803d;
+  --success-bg: #dcfce7;
+  --warning: #d97706;
+  --warning-bg: #fef3c7;
+  --danger: #dc2626;
+  --danger-bg: #fee2e2;
+  --pending: #7c3aed;
+  --pending-bg: #ede9fe;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.10);
+  --shadow-lg: 0 8px 32px rgba(14,116,144,0.12);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+[data-theme="dark"] {
+  --brand: #22d3ee;
+  --brand-light: #0c2d38;
+  --brand-dark: #67e8f9;
+  --bg-page: #0f172a;
+  --bg-card: #1e293b;
+  --bg-input: #162032;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border: #2d3f55;
+  --border-focus: #22d3ee;
+  --success: #4ade80;
+  --success-bg: #14532d;
+  --warning: #fbbf24;
+  --warning-bg: #451a03;
+  --danger: #f87171;
+  --danger-bg: #450a0a;
+  --pending: #a78bfa;
+  --pending-bg: #2e1065;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { -webkit-text-size-adjust: 100%; }
+html, body { min-height: 100%; }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  line-height: 1.5;
+  transition: background .3s, color .3s;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+.wrap {
+  max-width: 460px; margin: 0 auto;
+  padding: 0 16px calc(40px + env(safe-area-inset-bottom));
+}
+
+/* Header */
+header {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--bg-page);
+  padding: calc(16px + env(safe-area-inset-top)) 16px 12px;
+  max-width: 460px; margin: 0 auto;
+}
+.head-row { display: flex; align-items: center; gap: 12px; }
+.logo {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--brand); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; flex-shrink: 0; box-shadow: var(--shadow-md);
+}
+[data-theme="dark"] .logo { color: #04141a; }
+.head-info { flex: 1; min-width: 0; }
+.head-info h1 { font-size: 18px; font-weight: 800; line-height: 1.2; }
+.head-info p { font-size: 12.5px; color: var(--text-secondary); font-weight: 500; }
+.theme-btn {
+  width: 42px; height: 42px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--bg-card);
+  color: var(--text-primary); cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+  transition: background .2s, transform .15s;
+}
+.theme-btn:active { transform: scale(.9); }
+.clock-bar {
+  margin-top: 12px; font-size: 13px; color: var(--text-secondary);
+  font-weight: 600; display: flex; align-items: center; gap: 6px;
+}
+.clock-bar .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+
+/* Card */
+.card {
+  background: var(--bg-card); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+  padding: 22px; margin-top: 16px;
+}
+.card-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.card-sub { font-size: 13px; color: var(--text-secondary); margin-bottom: 18px; }
+
+/* Fields */
+.field { margin-bottom: 18px; }
+.field label { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 7px; }
+.field label .req { color: var(--danger); }
+.input-wrap { position: relative; }
+input.inp, textarea.inp, select.inp {
+  width: 100%; min-height: 52px; padding: 14px 44px 14px 14px;
+  font-family: inherit; font-size: 16px; color: var(--text-primary);
+  background: var(--bg-input); border: 1.5px solid var(--border);
+  border-radius: var(--radius-md); transition: border-color .2s, box-shadow .2s;
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+}
+textarea.inp { padding: 14px; min-height: 96px; resize: none; }
+select.inp {
+  cursor: pointer; line-height: 1.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center;
+}
+select.inp:required:invalid { color: var(--text-muted); }
+select.inp option { color: var(--text-primary); background: var(--bg-card); }
+select.inp option[disabled] { color: var(--text-muted); }
+input.inp:focus, textarea.inp:focus, select.inp:focus {
+  outline: none; border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
+}
+input.inp::placeholder, textarea.inp::placeholder { color: var(--text-muted); }
+.inp.valid { border-color: var(--success); }
+.inp.invalid { border-color: var(--danger); }
+.check-icon {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--success); font-size: 20px; opacity: 0; transition: opacity .2s;
+}
+.check-icon.show { opacity: 1; }
+.err-msg { font-size: 12px; color: var(--danger); margin-top: 5px; min-height: 0; display: none; }
+.err-msg.show { display: block; }
+
+/* Segmented purpose */
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.seg-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  min-height: 76px; padding: 14px 8px; border: 1.5px solid var(--border); background: var(--bg-input);
+  border-radius: var(--radius-md); cursor: pointer; font-family: inherit;
+  font-size: 13.5px; font-weight: 600; color: var(--text-secondary);
+  transition: all .18s;
+}
+.seg-btn i { font-size: 22px; }
+.seg-btn:active { transform: scale(.96); }
+.seg-btn.active { border-color: var(--brand); background: var(--brand-light); color: var(--brand); }
+[data-theme="dark"] .seg-btn.active { color: var(--brand); }
+.seg-btn.emergency { color: var(--danger); }
+.seg-btn.emergency.active { border-color: var(--danger); background: var(--danger-bg); color: var(--danger); }
+
+/* Feedback toggles */
+.fb-toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fb-btn {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 12px; border: 1.5px solid var(--border); background: var(--bg-input);
+  border-radius: var(--radius-md); cursor: pointer; font-family: inherit;
+  font-size: 13.5px; font-weight: 600; color: var(--text-secondary); transition: all .18s;
+}
+.fb-btn i { font-size: 18px; }
+.fb-btn.active[data-kind="feedback"] { border-color: var(--success); background: var(--success-bg); color: var(--success); }
+.fb-btn.active[data-kind="complaint"] { border-color: var(--danger); background: var(--danger-bg); color: var(--danger); }
+.fb-reveal { overflow: hidden; max-height: 0; opacity: 0; transition: max-height .35s ease, opacity .35s, margin-top .35s; }
+.fb-reveal.open { max-height: 260px; opacity: 1; margin-top: 12px; }
+.char-count { text-align: right; font-size: 11.5px; color: var(--text-muted); margin-top: 5px; }
+
+/* Submit */
+.submit-btn {
+  width: 100%; height: 56px; border: none; border-radius: var(--radius-md);
+  background: var(--brand); color: #fff; font-family: inherit;
+  font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 6px;
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  transition: opacity .2s, transform .15s; box-shadow: var(--shadow-md);
+}
+[data-theme="dark"] .submit-btn { color: #04141a; }
+.submit-btn:active { transform: scale(.985); }
+.submit-btn:disabled { opacity: .45; cursor: not-allowed; }
+.spinner {
+  width: 20px; height: 20px; border: 2.5px solid rgba(255,255,255,.4);
+  border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite;
+}
+[data-theme="dark"] .spinner { border-color: rgba(4,20,26,.35); border-top-color: #04141a; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Confirmation */
+.confirm-screen { display: none; text-align: center; padding-top: 10px; }
+.confirm-screen.show { display: block; animation: slideUp .4s ease; }
+.confirm-badge {
+  width: 70px; height: 70px; border-radius: 50%; background: var(--success-bg);
+  color: var(--success); font-size: 38px; display: flex; align-items: center;
+  justify-content: center; margin: 6px auto 14px;
+}
+.confirm-screen h2 { font-size: 19px; font-weight: 800; }
+.confirm-screen .lbl { font-size: 12.5px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; margin-top: 22px; }
+.token-num { font-size: clamp(80px, 26vw, 104px); font-weight: 900; color: var(--brand); line-height: 1; margin: 6px 0 4px; }
+.summary {
+  text-align: left; background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 16px; margin-top: 20px;
+}
+.summary .row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+.summary .row span:first-child { color: var(--text-secondary); }
+.summary .row span:last-child { font-weight: 600; }
+.fb-confirm {
+  margin-top: 14px; padding: 12px 14px; border-radius: var(--radius-md);
+  font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;
+}
+.fb-confirm.feedback { background: var(--success-bg); color: var(--success); }
+.fb-confirm.complaint { background: var(--danger-bg); color: var(--danger); }
+.wait-info {
+  margin-top: 18px; font-size: 14px; color: var(--text-secondary); font-weight: 500;
+}
+.wait-info strong { color: var(--brand); font-weight: 800; font-size: 16px; }
+.again-link {
+  display: inline-block; margin-top: 24px; color: var(--brand);
+  font-weight: 700; font-size: 14px; text-decoration: none; cursor: pointer;
+  padding: 12px; border-radius: var(--radius-md);
+}
+.badge-pill {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px;
+  border-radius: 999px; font-size: 12px; font-weight: 700;
+}
+.badge-pill.it { background: var(--brand-light); color: var(--brand); }
+.badge-pill.outlook { background: var(--success-bg); color: var(--success); }
+.badge-pill.hardware { background: var(--warning-bg); color: var(--warning); }
+.badge-pill.laptop { background: var(--pending-bg); color: var(--pending); }
+.badge-pill.other { background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border); }
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+}
+.footer-note { text-align: center; font-size: 11.5px; color: var(--text-muted); margin-top: 22px; }
+
+/* Small phones */
+@media (max-width: 360px) {
+  .wrap, header { padding-left: 12px; padding-right: 12px; }
+  .card { padding: 18px; }
+  .seg, .fb-toggles { gap: 8px; }
+  .seg-btn { min-height: 70px; font-size: 12.5px; padding: 10px 6px; }
+  .seg-btn i { font-size: 20px; }
+  .fb-btn { font-size: 12.5px; padding: 11px 8px; }
+  .head-info h1 { font-size: 16px; }
+}
+/* Larger / landscape: keep form centered and comfortable */
+@media (min-width: 520px) {
+  .card { padding: 26px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="head-row">
+    <div class="logo"><i class="ti ti-plane-tilt"></i></div>
+    <div class="head-info">
+      <h1 id="hospName">Fly Dubai</h1>
+      <p>Complaint Registration</p>
+    </div>
+    <button class="theme-btn" id="themeBtn" aria-label="Toggle theme"><i class="ti ti-moon"></i></button>
+  </div>
+  <div class="clock-bar"><span class="dot"></span><span id="clock">--:--</span></div>
+</header>
+
+<div class="wrap">
+  <!-- FORM -->
+  <div id="formView">
+    <div class="card">
+      <div class="card-title">Register a complaint</div>
+      <div class="card-sub">Fill in your details to log your complaint and get a token.</div>
+      <form id="regForm" novalidate>
+        <div class="field">
+          <label>Full Name <span class="req">*</span></label>
+          <div class="input-wrap">
+            <input class="inp" id="f_name" type="text" autocomplete="name" placeholder="e.g. Suresh Kumar" style="text-transform:capitalize" required>
+            <i class="ti ti-circle-check check-icon" id="chk_name"></i>
+          </div>
+          <div class="err-msg" id="err_name">Please enter your full name.</div>
+        </div>
+
+        <div class="field">
+          <label>Phone Number <span class="req">*</span></label>
+          <div class="input-wrap">
+            <input class="inp" id="f_phone" type="tel" inputmode="tel" maxlength="20" placeholder="e.g. 050 123 4567" required>
+            <i class="ti ti-circle-check check-icon" id="chk_phone"></i>
+          </div>
+          <div class="err-msg" id="err_phone">Please enter a phone number.</div>
+        </div>
+
+        <div class="field">
+          <label>Issue Type <span class="req">*</span></label>
+          <div class="input-wrap">
+            <select class="inp select" id="f_purpose" required>
+              <option value="" disabled selected>Select an issue type…</option>
+            </select>
+          </div>
+          <div class="err-msg" id="err_purpose">Please select an issue type.</div>
+        </div>
+
+        <div class="field" style="margin-bottom:8px">
+          <label>Complaint Details <span style="color:var(--text-muted);font-weight:500">(optional)</span></label>
+          <textarea class="inp" id="f_feedback" rows="4" maxlength="500" placeholder="Describe your complaint in detail…"></textarea>
+          <div class="char-count"><span id="charCount">0</span>/500</div>
+        </div>
+
+        <button type="submit" class="submit-btn" id="submitBtn" disabled>
+          <span id="submitLabel"><i class="ti ti-ticket"></i> Get My Token</span>
+        </button>
+      </form>
+    </div>
+    <div class="footer-note">Your details are kept confidential and used only for queue management.</div>
+  </div>
+
+  <!-- CONFIRMATION -->
+  <div class="confirm-screen" id="confirmView">
+    <div class="confirm-badge"><i class="ti ti-check"></i></div>
+    <h2>You're registered!</h2>
+    <div class="lbl">Your Token Number</div>
+    <div class="token-num" id="tokenDisplay">00</div>
+    <div class="summary" id="summaryBox"></div>
+    <div id="fbConfirmBox"></div>
+    <div class="wait-info" id="waitInfo"></div>
+    <a class="again-link" id="againLink"><i class="ti ti-plus"></i> Register another complaint</a>
+    <div class="footer-note">Please keep this token number and watch the display screen.</div>
+  </div>
+</div>
+
+<script>
+const CONFIG = {
+  hospitalName: "Fly Dubai",
+  hospitalTagline: "Your health, our priority",
+  purposes: [
+    { id: "it", label: "IT" },
+    { id: "outlook", label: "Outlook Issue" },
+    { id: "hardware", label: "Hardware Issues" },
+    { id: "laptop", label: "Laptop Issues" },
+    { id: "other", label: "Other Issues" }
+  ],
+  storageKey: "hospitalTokenData",
+  broadcastChannel: "hospital-token-channel",
+  adminPassword: "admin123"
+};
+
+/* ---------- Theme ---------- */
+function initTheme() {
+  const saved = localStorage.getItem('theme');
+  const sys = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  setTheme(saved || sys);
+}
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('theme', t);
+  document.querySelector('#themeBtn i').className = t === 'dark' ? 'ti ti-sun' : 'ti ti-moon';
+}
+document.getElementById('themeBtn').onclick = () => {
+  setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+};
+initTheme();
+document.getElementById('hospName').textContent = CONFIG.hospitalName;
+
+/* ---------- Clock ---------- */
+function fmtTime(d) {
+  let h = d.getHours(), m = d.getMinutes();
+  const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12;
+  return `${h}:${String(m).padStart(2,'0')} ${ap}`;
+}
+function tick() { document.getElementById('clock').textContent = fmtTime(new Date()); }
+tick(); setInterval(tick, 1000);
+
+/* ---------- Channel ---------- */
+const channel = new BroadcastChannel(CONFIG.broadcastChannel);
+
+/* ---------- State ---------- */
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function freshState() {
+  return { date: todayStr(), nextId: 1, tokens: [], queue: [], pending: [], currentToken: null, servedCount: 0 };
+}
+function getState() {
+  let s;
+  try { s = JSON.parse(localStorage.getItem(CONFIG.storageKey)); } catch(e) {}
+  if (!s || s.date !== todayStr()) { s = freshState(); saveState(s); }
+  return s;
+}
+function saveState(s) { localStorage.setItem(CONFIG.storageKey, JSON.stringify(s)); }
+
+/* ---------- Build issue-type dropdown ---------- */
+let selectedPurpose = null;
+const purposeSelect = document.getElementById('f_purpose');
+CONFIG.purposes.forEach(p => {
+  const o = document.createElement('option');
+  o.value = p.id; o.textContent = p.label;
+  purposeSelect.appendChild(o);
+});
+purposeSelect.addEventListener('change', () => {
+  selectedPurpose = purposeSelect.value || null;
+  document.getElementById('err_purpose').classList.remove('show');
+  validateAll();
+});
+
+/* ---------- Complaint details ---------- */
+const ta = document.getElementById('f_feedback');
+ta.oninput = () => { document.getElementById('charCount').textContent = ta.value.length; };
+
+/* ---------- Validation ---------- */
+const nameI = document.getElementById('f_name');
+const phoneI = document.getElementById('f_phone');
+// Allow international/UAE formats: digits, +, spaces, dashes, parentheses
+phoneI.addEventListener('input', () => { phoneI.value = phoneI.value.replace(/[^\d+\-\s()]/g,'').slice(0,20); });
+
+function vName() { return nameI.value.trim().length >= 2; }
+function vPhone() { return phoneI.value.replace(/\D/g,'').length >= 6; }
+
+function applyState(inp, chk, err, ok) {
+  if (inp.value === '') { inp.classList.remove('valid','invalid'); chk.classList.remove('show'); err.classList.remove('show'); return; }
+  if (ok) { inp.classList.add('valid'); inp.classList.remove('invalid'); chk.classList.add('show'); err.classList.remove('show'); }
+  else { inp.classList.add('invalid'); inp.classList.remove('valid'); chk.classList.remove('show'); err.classList.add('show'); }
+}
+function validateAll() {
+  applyState(nameI, document.getElementById('chk_name'), document.getElementById('err_name'), vName());
+  applyState(phoneI, document.getElementById('chk_phone'), document.getElementById('err_phone'), vPhone());
+  const ok = vName() && vPhone() && selectedPurpose;
+  document.getElementById('submitBtn').disabled = !ok;
+  return ok;
+}
+[nameI, phoneI].forEach(i => i.addEventListener('input', validateAll));
+[nameI, phoneI].forEach(i => i.addEventListener('blur', validateAll));
+
+/* ---------- Submit ---------- */
+document.getElementById('regForm').addEventListener('submit', e => {
+  e.preventDefault();
+  if (!validateAll()) {
+    if (!selectedPurpose) document.getElementById('err_purpose').classList.add('show');
+    return;
+  }
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  document.getElementById('submitLabel').innerHTML = '<span class="spinner"></span> Registering...';
+
+  setTimeout(async () => {
+    const payload = {
+      name: nameI.value.trim().replace(/\b\w/g, c => c.toUpperCase()),
+      phone: phoneI.value,
+      purpose: selectedPurpose,
+      feedback: ta.value.trim(),
+      feedbackType: ta.value.trim() ? 'complaint' : ''
+    };
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('bad response');
+      const data = await res.json();
+      showConfirm(data.token, data.ahead);
+    } catch (err) {
+      btn.disabled = false;
+      document.getElementById('submitLabel').innerHTML = '<i class="ti ti-ticket"></i> Get My Token';
+      alert('Could not reach the queue server. Make sure you are on the same Wi-Fi and try again.');
+    }
+  }, 600);
+});
+
+function showConfirm(token, ahead) {
+  document.getElementById('formView').style.display = 'none';
+  const cv = document.getElementById('confirmView');
+  cv.classList.add('show');
+  window.scrollTo(0, 0);
+
+  // count up
+  const target = token.id, td = document.getElementById('tokenDisplay');
+  let cur = 0; const step = Math.max(1, Math.ceil(target / 25));
+  const iv = setInterval(() => {
+    cur += step; if (cur >= target) { cur = target; clearInterval(iv); }
+    td.textContent = String(cur).padStart(2,'0');
+  }, 35);
+
+  const pLabel = CONFIG.purposes.find(p => p.id === token.purpose).label;
+  document.getElementById('summaryBox').innerHTML = `
+    <div class="row"><span>Name</span><span>${esc(token.name)}</span></div>
+    <div class="row"><span>Phone</span><span>${token.phone}</span></div>
+    <div class="row"><span>Purpose</span><span class="badge-pill ${token.purpose}">${pLabel}</span></div>
+    <div class="row"><span>Registered</span><span>${token.registeredAt}</span></div>`;
+
+  const fbBox = document.getElementById('fbConfirmBox');
+  if (token.feedbackType) {
+    fbBox.innerHTML = `<div class="fb-confirm ${token.feedbackType}"><i class="ti ti-${token.feedbackType==='complaint'?'alert-triangle':'message-heart'}"></i> Your ${token.feedbackType} has been recorded.</div>`;
+  } else fbBox.innerHTML = '';
+
+  const aheadCount = ahead < 0 ? 0 : ahead;
+  document.getElementById('waitInfo').innerHTML =
+    aheadCount === 0 ? `You're <strong>next</strong> in line!` : `<strong>${aheadCount}</strong> patient${aheadCount>1?'s':''} ahead of you.`;
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+document.getElementById('againLink').onclick = () => {
+  document.getElementById('regForm').reset();
+  selectedPurpose = null;
+  purposeSelect.value = '';
+  document.querySelectorAll('.inp').forEach(x => x.classList.remove('valid','invalid'));
+  document.querySelectorAll('.check-icon').forEach(x => x.classList.remove('show'));
+  document.querySelectorAll('.err-msg').forEach(x => x.classList.remove('show'));
+  document.getElementById('charCount').textContent = '0';
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('submitLabel').innerHTML = '<i class="ti ti-ticket"></i> Get My Token';
+  document.getElementById('confirmView').classList.remove('show');
+  document.getElementById('formView').style.display = 'block';
+  window.scrollTo(0,0);
+};
+
+// Pull live hospital name from the shared server (falls back to CONFIG default)
+fetch('/api/state').then(r => r.json()).then(s => {
+  if (s && s.hospitalName) document.getElementById('hospName').textContent = s.hospitalName;
+}).catch(() => {});
+</script>
+</body>
+</html>
