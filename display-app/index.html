@@ -156,7 +156,7 @@ const CONFIG = {
 /* ---- Backend API base ----
    Local (served by server.py): same origin. Hosted on Vercel: set to your Render backend URL. */
 const API_BASE = (location.protocol === 'file:' || /^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname))
-  ? '' : 'https://REPLACE-WITH-YOUR-RENDER-URL.onrender.com';
+  ? '' : 'https://flydubai-complaint-queue.onrender.com';
 const channel = new BroadcastChannel(CONFIG.broadcastChannel);
 const purposeLabel = id => (CONFIG.purposes.find(p=>p.id===id)||{label:id}).label;
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
