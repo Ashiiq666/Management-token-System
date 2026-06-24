@@ -120,7 +120,7 @@ header {
   <div class="left">
     <div class="now-lbl">Now Serving</div>
     <div class="token-stage" id="tokenStage">
-      <div class="big-token empty" id="bigToken">—</div>
+      <div class="big-token empty" id="bigToken">00</div>
     </div>
     <div id="patientArea">
       <div class="waiting-msg" id="waitingMsg">Waiting for next call…</div>
@@ -204,7 +204,7 @@ function render(s){
         <div class="proceed"><span class="dot"></span> Please proceed to counter</div>`;
     }
   } else {
-    big.textContent = '—'; big.className = 'big-token empty';
+    big.textContent = '00'; big.className = 'big-token empty';
     pArea.innerHTML = `<div class="waiting-msg">Waiting for next call…</div>`;
   }
   lastToken = s.currentToken;
