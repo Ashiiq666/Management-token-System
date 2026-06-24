@@ -216,7 +216,7 @@ function render(s){
       html += `<div class="serve-block ${changed?'pop':''}">
         <div class="now-lbl">Now Serving${n>1?' · Counter '+c:''}</div>
         <div class="token-stage"><div class="big-token has">${num}</div></div>
-        <div class="pname">${esc(t.name)} ${t.isVip?'<span class="vip-badge"><i class="ti ti-star-filled"></i> VIP</span>':''}</div>
+        <div class="pname">${esc(t.name)}</div>
         ${n>1?`<div class="counter-lbl"><i class="ti ti-building-store"></i> Counter ${c}</div>`:''}
         <div class="proceed"><span class="dot"></span> Proceed to ${n>1?('Counter '+c):'counter'}</div>
       </div>`;
