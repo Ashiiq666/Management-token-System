@@ -297,7 +297,7 @@ input.inp::placeholder, textarea.inp::placeholder { color: var(--text-muted); }
         <div class="field">
           <label>Full Name <span class="req">*</span></label>
           <div class="input-wrap">
-            <input class="inp" id="f_name" type="text" autocomplete="name" placeholder="e.g. Suresh Kumar" style="text-transform:capitalize" required>
+            <input class="inp" id="f_name" type="text" autocomplete="name" maxlength="60" placeholder="e.g. Suresh Kumar" style="text-transform:capitalize" required>
             <i class="ti ti-circle-check check-icon" id="chk_name"></i>
           </div>
           <div class="err-msg" id="err_name">Please enter your full name.</div>
@@ -374,9 +374,11 @@ const stateRef = firebase.database().ref('state');
 function dubaiToday(){ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dubai'}).format(new Date()); }
 function dubaiTime(){ return new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Dubai',hour:'numeric',minute:'2-digit',hour12:true}).format(new Date()); }
 function freshState(name){ return { date: dubaiToday(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
+// Firebase can return arrays as objects (with integer keys) — coerce back to a real array.
+function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function normalize(s){
   if(!s || s.date !== dubaiToday()) return freshState(s && s.hospitalName);
-  s.tokens = s.tokens || []; s.queue = s.queue || []; s.pending = s.pending || [];
+  s.tokens = toArr(s.tokens); s.queue = toArr(s.queue); s.pending = toArr(s.pending);
   if(s.currentToken === undefined) s.currentToken = null;
   s.nextId = s.nextId || 1; s.servedCount = s.servedCount || 0;
   s.hospitalName = s.hospitalName || CONFIG.hospitalName;
@@ -399,13 +401,8 @@ document.getElementById('themeBtn').onclick = () => {
 initTheme();
 document.getElementById('hospName').textContent = CONFIG.hospitalName;
 
-/* ---------- Clock ---------- */
-function fmtTime(d) {
-  let h = d.getHours(), m = d.getMinutes();
-  const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12;
-  return `${h}:${String(m).padStart(2,'0')} ${ap}`;
-}
-function tick() { document.getElementById('clock').textContent = fmtTime(new Date()); }
+/* ---------- Clock (Dubai time) ---------- */
+function tick() { document.getElementById('clock').textContent = dubaiTime(); }
 tick(); setInterval(tick, 1000);
 
 /* ---------- Register a complaint (atomic Firebase transaction) ---------- */

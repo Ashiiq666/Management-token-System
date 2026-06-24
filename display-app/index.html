@@ -160,9 +160,10 @@ const FIREBASE_DB_URL = "https://flydubai-17161-default-rtdb.asia-southeast1.fir
 firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
 const stateRef = firebase.database().ref('state');
 function dubaiToday(){ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dubai'}).format(new Date()); }
+function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function normalize(s){
   if(!s || s.date !== dubaiToday()) return { date:dubaiToday(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName:(s&&s.hospitalName)||CONFIG.hospitalName };
-  s.tokens=s.tokens||[]; s.queue=s.queue||[]; s.pending=s.pending||[];
+  s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending);
   if(s.currentToken===undefined) s.currentToken=null;
   s.hospitalName=s.hospitalName||CONFIG.hospitalName;
   return s;
@@ -175,13 +176,13 @@ document.getElementById('hospName').textContent = CONFIG.hospitalName;
 document.getElementById('idleName').textContent = CONFIG.hospitalName;
 
 /* Clock */
+const TZ = 'Asia/Dubai';
 function tick(){
   const d = new Date();
-  const c = d.toLocaleTimeString('en-US',{hour12:false});
-  document.getElementById('clock').textContent = c;
-  document.getElementById('date').textContent = d.toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).toUpperCase();
-  document.getElementById('idleClock').textContent = d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true});
-  document.getElementById('idleDate').textContent = d.toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long'}).toUpperCase();
+  document.getElementById('clock').textContent = d.toLocaleTimeString('en-US',{hour12:false,timeZone:TZ});
+  document.getElementById('date').textContent = d.toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:TZ}).toUpperCase();
+  document.getElementById('idleClock').textContent = d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:TZ});
+  document.getElementById('idleDate').textContent = d.toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long',timeZone:TZ}).toUpperCase();
 }
 tick(); setInterval(tick,1000);
 

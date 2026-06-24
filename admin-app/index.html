@@ -366,9 +366,11 @@ const stateRef = firebase.database().ref('state');
 function dubaiToday(){ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dubai'}).format(new Date()); }
 function dubaiTime(){ return new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Dubai',hour:'numeric',minute:'2-digit',hour12:true}).format(new Date()); }
 function freshState(name){ return { date: dubaiToday(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
+// Firebase can return arrays as objects (with integer keys) — coerce back to a real array.
+function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function normalize(s){
   if(!s || s.date !== dubaiToday()) return freshState(s && s.hospitalName);
-  s.tokens=s.tokens||[]; s.queue=s.queue||[]; s.pending=s.pending||[];
+  s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending);
   if(s.currentToken===undefined) s.currentToken=null;
   s.nextId=s.nextId||1; s.servedCount=s.servedCount||0;
   s.hospitalName=s.hospitalName||CONFIG.hospitalName;
@@ -396,8 +398,8 @@ function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${String(d.g
 function fmtTime(d){ let h=d.getHours(),m=d.getMinutes(); const ap=h>=12?'PM':'AM'; h=h%12||12; return `${h}:${String(m).padStart(2,'0')} ${ap}`; }
 function tick(){
   const d=new Date();
-  document.getElementById('sbClock').textContent = d.toLocaleTimeString('en-US',{hour12:true});
-  document.getElementById('sbDate').textContent = d.toLocaleDateString('en-US',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  document.getElementById('sbClock').textContent = d.toLocaleTimeString('en-US',{hour12:true,timeZone:'Asia/Dubai'});
+  document.getElementById('sbDate').textContent = d.toLocaleDateString('en-US',{weekday:'short',day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Dubai'});
 }
 tick(); setInterval(tick,1000);
 
@@ -626,7 +628,7 @@ function renderTable(){
   if (!rows.length){ tb.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:30px">No matching registrations</td></tr>`; return; }
   tb.innerHTML = rows.map(t=>`<tr>
     <td><span class="tok">${String(t.id).padStart(2,'0')}</span></td>
-    <td>${esc(t.name)}</td><td>${t.phone}</td>
+    <td>${esc(t.name)}</td><td>${esc(t.phone)}</td>
     <td><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span></td>
     <td><span class="st ${t.status}">${t.status}</span></td>
     <td>${t.registeredAt}</td></tr>`).join('');
@@ -649,7 +651,7 @@ function renderFeedback(){
 function emptyFb(msg){ return `<div class="empty" style="padding:20px"><i class="ti ti-mail-off"></i>${msg}</div>`; }
 function fbCard(t){
   return `<div class="fb-card ${t.reviewed?'':'unreviewed'}">
-    <div class="top"><div class="who">Token ${String(t.id).padStart(2,'0')} — ${esc(t.name)} <span>· ${t.phone}</span></div>
+    <div class="top"><div class="who">Token ${String(t.id).padStart(2,'0')} — ${esc(t.name)} <span>· ${esc(t.phone)}</span></div>
       <span class="st ${t.feedbackType==='complaint'?'pending':'done'}">${t.feedbackType}</span></div>
     <div class="msg">${esc(t.feedback)}</div>
     <div class="foot"><span class="tm"><i class="ti ti-clock"></i> ${t.registeredAt}</span>
@@ -697,7 +699,7 @@ function printReport(){
     <h1>${esc(CONFIG.hospitalName)}</h1><p><strong>Daily Token Report</strong> — ${new Date().toDateString()}</p>
     <div class="s"><div>Total: <strong>${s.tokens.length}</strong></div><div>Completed: <strong>${done}</strong></div><div>Pending: <strong>${s.pending.length}</strong></div></div>
     <table><thead><tr><th>Token</th><th>Name</th><th>Phone</th><th>Purpose</th><th>Status</th><th>Registered</th></tr></thead><tbody>
-    ${s.tokens.map(t=>`<tr><td>${String(t.id).padStart(2,'0')}</td><td>${esc(t.name)}</td><td>${t.phone}</td><td>${purposeLabel(t.purpose)}</td><td>${t.status}</td><td>${t.registeredAt}</td></tr>`).join('')}
+    ${s.tokens.map(t=>`<tr><td>${String(t.id).padStart(2,'0')}</td><td>${esc(t.name)}</td><td>${esc(t.phone)}</td><td>${purposeLabel(t.purpose)}</td><td>${t.status}</td><td>${t.registeredAt}</td></tr>`).join('')}
     </tbody></table></body></html>`);
   w.document.close(); w.focus(); setTimeout(()=>w.print(), 300);
 }
