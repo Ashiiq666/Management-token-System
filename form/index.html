@@ -394,6 +394,8 @@ function normalize(s){
   s.servedCount = s.servedCount || 0;
   s.hospitalName = s.hospitalName || CONFIG.hospitalName;
   s.tokens.forEach(t=>{ if(t.no==null) t.no=t.id; });
+  const onCounter = new Set(Object.values(s.serving||{}).filter(v=>v!=null));
+  s.tokens.forEach(t=>{ if(t.status==='serving' && !onCounter.has(t.id)){ t.status='waiting'; if(!s.queue.includes(t.id) && !(s.vip||[]).includes(t.id)){ if(t.isVip) s.vip.push(t.id); else s.queue.unshift(t.id); } } });
   return s;
 }
 

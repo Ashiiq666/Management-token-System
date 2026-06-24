@@ -432,7 +432,20 @@ function normalize(s){
   s.servedCount=s.servedCount||0;
   s.hospitalName=s.hospitalName||CONFIG.hospitalName;
   s.tokens.forEach(t=>{ if(t.no==null) t.no=t.id; }); // backfill display number for old data
+  reconcileServing(s);
   return s;
+}
+// Self-heal: any 'serving' token that isn't actually on a counter goes back to the queue (never lost)
+function reconcileServing(s){
+  const onCounter = new Set(Object.values(s.serving||{}).filter(v=>v!=null));
+  s.tokens.forEach(t=>{
+    if(t.status==='serving' && !onCounter.has(t.id)){
+      t.status = 'waiting';
+      if(!s.queue.includes(t.id) && !(s.vip||[]).includes(t.id)){
+        if(t.isVip) s.vip.push(t.id); else s.queue.unshift(t.id);
+      }
+    }
+  });
 }
 // VIP slot counter is forward-only: 1→2→3→4→5, never reused (even after a slot is served).
 function assignVipNo(s){ return (s.nextVip||1) <= 5 ? (s.nextVip||1) : null; }
@@ -674,7 +687,7 @@ function render(){
   const s = state;
   if (!s) return;
   const waiting = s.tokens.filter(t=>t.status==='waiting').length;
-  const serving = s.tokens.filter(t=>t.status==='serving').length;
+  const serving = Object.values(s.serving||{}).filter(v=>v!=null).length;
   const done = s.tokens.filter(t=>t.status==='done').length;
   document.getElementById('mTotal').textContent = s.tokens.length;
   document.getElementById('mWaiting').textContent = waiting;
