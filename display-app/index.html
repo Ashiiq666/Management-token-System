@@ -194,7 +194,7 @@ function render(s){
   if (s.currentToken != null){
     const t = s.tokens.find(x=>x.id===s.currentToken);
     if (t){
-      big.textContent = pad(t.no);
+      big.textContent = pad(t.isVip ? t.vipNo : t.no);
       big.className = 'big-token has';
       if (s.currentToken !== lastToken){
         big.classList.remove('anim'); void big.offsetWidth; big.classList.add('anim');
