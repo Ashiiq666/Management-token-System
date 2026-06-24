@@ -400,16 +400,26 @@ const stateRef = firebase.database().ref('state');
 // Region-based: uses whatever timezone the device is set to (Dubai → Dubai, London → London)
 function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date()); }
 function localTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}); }
-function freshState(name){ return { date: localDay(), nextId:1, tokens:[], queue:[], pending:[], vip:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
+// VIP token numbers 1–5 are reserved; normal tokens start at 6.
+function freshState(name){ return { date: localDay(), seq:1, nextNormal:6, tokens:[], queue:[], pending:[], vip:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
 // Firebase can return arrays as objects (with integer keys) — coerce back to a real array.
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function normalize(s){
   if(!s || s.date !== localDay()) return freshState(s && s.hospitalName);
   s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending); s.vip=toArr(s.vip);
   if(s.currentToken===undefined) s.currentToken=null;
-  s.nextId=s.nextId||1; s.servedCount=s.servedCount||0;
+  s.seq = s.seq || s.nextId || (s.tokens.length ? Math.max(...s.tokens.map(t=>t.id))+1 : 1);
+  s.nextNormal = s.nextNormal || 6;
+  s.servedCount=s.servedCount||0;
   s.hospitalName=s.hospitalName||CONFIG.hospitalName;
+  s.tokens.forEach(t=>{ if(t.no==null) t.no=t.id; }); // backfill display number for old data
   return s;
+}
+// Lowest free VIP number (1–5); null if all are in use by active VIPs
+function assignVipNo(s){
+  const used = new Set(s.tokens.filter(t=>t.isVip && t.status!=='done').map(t=>t.no));
+  for(let n=1;n<=5;n++){ if(!used.has(n)) return n; }
+  return null;
 }
 function findTok(s, id){ return s.tokens.find(t => t.id === id); }
 const purposeLabel = id => (CONFIG.purposes.find(p => p.id === id) || {label:id}).label;
@@ -455,14 +465,19 @@ function applyOp(s, op, d){
     if(s.currentToken!=null){ const t=findTok(s,s.currentToken); if(t){ t.status='pending'; t.isVip=false; if(!s.pending.includes(t.id)) s.pending.push(t.id); } s.currentToken=null; }
   } else if(op==='vip-add'){
     const t=findTok(s,d.id);
-    if(t && (t.status==='waiting' || t.status==='pending')){
-      s.queue=s.queue.filter(x=>x!==d.id); s.pending=s.pending.filter(x=>x!==d.id);
-      if(!s.vip.includes(d.id)) s.vip.push(d.id);
-      t.isVip=true; t.status='waiting';
+    if(t && !t.isVip && (t.status==='waiting' || t.status==='pending')){
+      const vno = assignVipNo(s);
+      if(vno!=null){
+        s.queue=s.queue.filter(x=>x!==d.id); s.pending=s.pending.filter(x=>x!==d.id);
+        if(!s.vip.includes(d.id)) s.vip.push(d.id);
+        t.isVip=true; t.status='waiting'; t.no=vno; // reassign to reserved VIP number 1–5
+      }
     }
   } else if(op==='vip-remove'){
     s.vip=s.vip.filter(x=>x!==d.id);
-    const t=findTok(s,d.id); if(t){ t.isVip=false; if(t.status==='waiting' && !s.queue.includes(d.id)) s.queue.push(d.id); }
+    const t=findTok(s,d.id);
+    if(t){ t.isVip=false; t.no=s.nextNormal; s.nextNormal=s.nextNormal+1; // back to a normal number
+      if(t.status==='waiting' && !s.queue.includes(d.id)) s.queue.push(d.id); }
   } else if(op==='skip-queued'){
     s.queue=s.queue.filter(x=>x!==d.id); const t=findTok(s,d.id); if(t){ t.status='pending'; if(!s.pending.includes(d.id)) s.pending.push(d.id); }
   } else if(op==='reinsert'){
@@ -563,19 +578,24 @@ document.getElementById('callNextBtn').onclick = async () => {
   const wasVip = state.vip.length > 0;
   const ns = await op('call-next');
   if (!ns) return;
-  if (ns.currentToken != null) { chime(); flashCurrent(); toast((wasVip?'★ Now serving VIP token ':'Now serving token ') + String(ns.currentToken).padStart(2,'0')); }
+  if (ns.currentToken != null) { const ct = ns.tokens.find(t=>t.id===ns.currentToken); const n = ct ? ct.no : ns.currentToken; chime(); flashCurrent(); toast((wasVip?'★ Now serving VIP token ':'Now serving token ') + String(n).padStart(2,'0')); }
   else toast(hadAnyone ? 'Queue is empty' : 'No one waiting');
 };
 async function markDone(){ if (await op('mark-done')) toast('Marked as done'); }
 async function skipCurrent(){ if (await op('skip-current')) toast('Token moved to pending'); }
 async function skipQueued(id){ if (await op('skip-queued', { id })) toast('Skipped to pending'); }
-async function vipAdd(id){ if (await op('vip-add', { id })) toast('★ Added to VIP queue'); }
+async function vipAdd(id){
+  const activeVip = state.tokens.filter(t=>t.isVip && t.status!=='done').length;
+  if (activeVip >= 5) { toast('⚠ VIP full (1–5). Finish a VIP first.'); return; }
+  if (await op('vip-add', { id })) toast('★ Added to VIP queue');
+}
 async function vipRemove(id){ if (await op('vip-remove', { id })) toast('Removed from VIP queue'); }
 
 /* ---- Re-insert ---- */
 function openReinsert(id){
+  const rt = state && state.tokens.find(x=>x.id===id);
   const html = `
-    <h3>Re-insert Token ${String(id).padStart(2,'0')}</h3>
+    <h3>Re-insert Token ${String(rt?rt.no:id).padStart(2,'0')}</h3>
     <p>Choose where to place this token back in the queue.</p>
     <div class="reinsert-opts">
       <button data-mode="next"><i class="ti ti-arrow-bar-up"></i> As next (front of queue)</button>
@@ -618,7 +638,7 @@ function render(){
   const curNum = document.getElementById('curNum'), curInfo=document.getElementById('curInfo'), curActions=document.getElementById('curActions');
   if (s.currentToken!=null){
     const t = s.tokens.find(x=>x.id===s.currentToken);
-    curNum.textContent = String(t.id).padStart(2,'0');
+    curNum.textContent = String(t.no).padStart(2,'0');
     curInfo.innerHTML = `<h3>${esc(t.name)}</h3><div class="meta"><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span><span><i class="ti ti-clock"></i> Called ${t.calledAt||''}</span></div>`;
     curActions.innerHTML = `<button class="btn btn-success" onclick="markDone()"><i class="ti ti-check"></i> Mark Done</button><button class="btn btn-skip" onclick="skipCurrent()"><i class="ti ti-player-skip-forward"></i> Skip</button>`;
   } else {
@@ -634,7 +654,7 @@ function render(){
   else qb.innerHTML = s.queue.map((id,i)=>{
     const t = s.tokens.find(x=>x.id===id);
     return `<div class="q-item ${i===0?'upnext':''}">
-      <div class="q-tok">${String(t.id).padStart(2,'0')}</div>
+      <div class="q-tok">${String(t.no).padStart(2,'0')}</div>
       <div class="q-mid"><div class="nm">${esc(t.name)} ${i===0?'<span class="upnext-tag">• up next</span>':''}</div>
         <div class="sub"><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span><span>${t.registeredAt}</span></div></div>
       <button class="btn btn-skip" onclick="skipQueued(${t.id})"><i class="ti ti-player-skip-forward"></i></button>
@@ -648,7 +668,7 @@ function render(){
   else pb.innerHTML = s.pending.map(id=>{
     const t = s.tokens.find(x=>x.id===id);
     return `<div class="q-item">
-      <div class="q-tok">${String(t.id).padStart(2,'0')}</div>
+      <div class="q-tok">${String(t.no).padStart(2,'0')}</div>
       <div class="q-mid"><div class="nm">${esc(t.name)}</div>
         <div class="sub"><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span></div></div>
       <button class="btn btn-ghost" onclick="openReinsert(${t.id})"><i class="ti ti-arrow-back-up"></i> Re-insert</button>
@@ -664,7 +684,7 @@ function render(){
     document.getElementById('vipBody').innerHTML = s.vip.map((id,i)=>{
       const t = s.tokens.find(x=>x.id===id); if(!t) return '';
       return `<div class="vip-item ${i===0?'first':''}">
-        <div class="q-tok">${String(t.id).padStart(2,'0')}</div>
+        <div class="q-tok">${String(t.no).padStart(2,'0')}</div>
         <div class="q-mid"><div class="nm">${esc(t.name)} ${i===0?'<span class="upnext-tag" style="color:#b45309">• next</span>':''}</div>
           <div class="sub"><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span><span>${t.registeredAt}</span></div></div>
         <button class="btn btn-ghost" onclick="vipRemove(${t.id})"><i class="ti ti-star-off"></i> Remove</button>
@@ -674,7 +694,7 @@ function render(){
 
   // Call Next button reflects whether a VIP is up next
   const cn = document.getElementById('callNextBtn');
-  if (s.vip.length) cn.innerHTML = `<i class="ti ti-star-filled"></i> Call VIP Token ${String(s.vip[0]).padStart(2,'0')}`;
+  if (s.vip.length) { const vt = s.tokens.find(x=>x.id===s.vip[0]); cn.innerHTML = `<i class="ti ti-star-filled"></i> Call VIP Token ${String(vt?vt.no:s.vip[0]).padStart(2,'0')}`; }
   else cn.innerHTML = `<i class="ti ti-player-play-filled"></i> Call Next Token`;
 
   renderTable();
@@ -707,7 +727,7 @@ function renderTable(){
       ? `<button class="star-btn on" title="Remove from VIP" onclick="vipRemove(${t.id})"><i class="ti ti-star-filled"></i></button>`
       : (canVip ? `<button class="star-btn" title="Add to VIP queue" onclick="vipAdd(${t.id})"><i class="ti ti-star"></i></button>` : `<span style="color:var(--text-muted)">—</span>`);
     return `<tr>
-      <td><span class="tok">${String(t.id).padStart(2,'0')}</span></td>
+      <td><span class="tok">${String(t.no).padStart(2,'0')}</span></td>
       <td>${esc(t.name)} ${t.isVip?'<span class="vip-tag">VIP</span>':''}</td><td>${esc(t.phone)}</td>
       <td><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span></td>
       <td><span class="st ${t.status}">${t.status}</span></td>
@@ -733,7 +753,7 @@ function renderFeedback(){
 function emptyFb(msg){ return `<div class="empty" style="padding:20px"><i class="ti ti-mail-off"></i>${msg}</div>`; }
 function fbCard(t){
   return `<div class="fb-card ${t.reviewed?'':'unreviewed'}">
-    <div class="top"><div class="who">Token ${String(t.id).padStart(2,'0')} — ${esc(t.name)} <span>· ${esc(t.phone)}</span></div>
+    <div class="top"><div class="who">Token ${String(t.no).padStart(2,'0')} — ${esc(t.name)} <span>· ${esc(t.phone)}</span></div>
       <span class="st ${t.feedbackType==='complaint'?'pending':'done'}">${t.feedbackType}</span></div>
     <div class="msg">${esc(t.feedback)}</div>
     <div class="foot"><span class="tm"><i class="ti ti-clock"></i> ${t.registeredAt}</span>
@@ -812,7 +832,7 @@ function printReport(){
     <h1>${esc(CONFIG.hospitalName)}</h1><p><strong>Daily Token Report</strong> — ${new Date().toDateString()}</p>
     <div class="s"><div>Total: <strong>${s.tokens.length}</strong></div><div>Completed: <strong>${done}</strong></div><div>Pending: <strong>${s.pending.length}</strong></div></div>
     <table><thead><tr><th>Token</th><th>Name</th><th>Phone</th><th>Purpose</th><th>Status</th><th>Registered</th></tr></thead><tbody>
-    ${s.tokens.map(t=>`<tr><td>${String(t.id).padStart(2,'0')}</td><td>${esc(t.name)}</td><td>${esc(t.phone)}</td><td>${purposeLabel(t.purpose)}</td><td>${t.status}</td><td>${t.registeredAt}</td></tr>`).join('')}
+    ${s.tokens.map(t=>`<tr><td>${String(t.no).padStart(2,'0')}</td><td>${esc(t.name)}</td><td>${esc(t.phone)}</td><td>${purposeLabel(t.purpose)}</td><td>${t.status}</td><td>${t.registeredAt}</td></tr>`).join('')}
     </tbody></table></body></html>`);
   w.document.close(); w.focus(); setTimeout(()=>w.print(), 300);
 }

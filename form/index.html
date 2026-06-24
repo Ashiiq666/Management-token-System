@@ -381,15 +381,19 @@ const stateRef = firebase.database().ref('state');
 // Region-based: uses whatever timezone the device is set to (Dubai → Dubai, London → London)
 function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date()); }
 function localTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}); }
-function freshState(name){ return { date: localDay(), nextId:1, tokens:[], queue:[], pending:[], vip:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
+// VIP token numbers 1–5 are reserved; normal tokens start at 6.
+function freshState(name){ return { date: localDay(), seq:1, nextNormal:6, tokens:[], queue:[], pending:[], vip:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
 // Firebase can return arrays as objects (with integer keys) — coerce back to a real array.
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function normalize(s){
   if(!s || s.date !== localDay()) return freshState(s && s.hospitalName);
   s.tokens = toArr(s.tokens); s.queue = toArr(s.queue); s.pending = toArr(s.pending); s.vip = toArr(s.vip);
   if(s.currentToken === undefined) s.currentToken = null;
-  s.nextId = s.nextId || 1; s.servedCount = s.servedCount || 0;
+  s.seq = s.seq || s.nextId || (s.tokens.length ? Math.max(...s.tokens.map(t=>t.id))+1 : 1);
+  s.nextNormal = s.nextNormal || 6;
+  s.servedCount = s.servedCount || 0;
   s.hospitalName = s.hospitalName || CONFIG.hospitalName;
+  s.tokens.forEach(t=>{ if(t.no==null) t.no=t.id; });
   return s;
 }
 
@@ -420,22 +424,24 @@ function registerComplaint(payload) {
     stateRef.transaction(cur => {
       const s = normalize(cur);
       const t = {
-        id: s.nextId, cuid,
+        id: s.seq, no: s.nextNormal, cuid,   // internal id + reserved-aware display number (6+)
         name: payload.name, phone: payload.phone, purpose: payload.purpose,
         feedback: payload.feedback || '', feedbackType: payload.feedbackType || '',
         status: 'waiting', registeredAt: localTime(),
-        calledAt: null, doneAt: null, reviewed: false
+        calledAt: null, doneAt: null, reviewed: false, isVip: false
       };
       s.tokens.push(t);
       s.queue.push(t.id);
-      s.nextId = s.nextId + 1;
+      s.seq = s.seq + 1;
+      s.nextNormal = s.nextNormal + 1;
       return s;
     }, (err, committed, snap) => {
       if (err || !committed) return reject(err || new Error('not committed'));
       const s = normalize(snap.val());
       const mine = s.tokens.find(x => x.cuid === cuid);
-      const ahead = mine ? s.queue.indexOf(mine.id) : 0;
-      resolve({ token: mine, ahead: ahead < 0 ? 0 : ahead });
+      const pos = mine ? s.queue.indexOf(mine.id) : 0;
+      const ahead = (s.vip.length) + (pos < 0 ? 0 : pos);
+      resolve({ token: mine, ahead });
     });
   });
 }
@@ -519,7 +525,7 @@ function showConfirm(token, ahead) {
   window.scrollTo(0, 0);
 
   // count up
-  const target = token.id, td = document.getElementById('tokenDisplay');
+  const target = token.no, td = document.getElementById('tokenDisplay');
   let cur = 0; const step = Math.max(1, Math.ceil(target / 25));
   const iv = setInterval(() => {
     cur += step; if (cur >= target) { cur = target; clearInterval(iv); }

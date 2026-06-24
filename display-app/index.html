@@ -162,10 +162,11 @@ const stateRef = firebase.database().ref('state');
 function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date()); }
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function normalize(s){
-  if(!s || s.date !== localDay()) return { date:localDay(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName:(s&&s.hospitalName)||CONFIG.hospitalName };
+  if(!s || s.date !== localDay()) return { date:localDay(), seq:1, nextNormal:6, tokens:[], queue:[], pending:[], vip:[], currentToken:null, servedCount:0, hospitalName:(s&&s.hospitalName)||CONFIG.hospitalName };
   s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending); s.vip=toArr(s.vip);
   if(s.currentToken===undefined) s.currentToken=null;
   s.hospitalName=s.hospitalName||CONFIG.hospitalName;
+  s.tokens.forEach(t=>{ if(t.no==null) t.no=t.id; });
   return s;
 }
 const purposeLabel = id => (CONFIG.purposes.find(p=>p.id===id)||{label:id}).label;
@@ -193,7 +194,7 @@ function render(s){
   if (s.currentToken != null){
     const t = s.tokens.find(x=>x.id===s.currentToken);
     if (t){
-      big.textContent = pad(t.id);
+      big.textContent = pad(t.no);
       big.className = 'big-token has';
       if (s.currentToken !== lastToken){
         big.classList.remove('anim'); void big.offsetWidth; big.classList.add('anim');
@@ -215,7 +216,7 @@ function render(s){
   else list.innerHTML = upcoming.map((id,i)=>{
     const t = s.tokens.find(x=>x.id===id);
     return `<div class="up-card ${i===0?'first':''}">
-      <div class="up-num">${pad(t.id)}</div>
+      <div class="up-num">${pad(t.no)}</div>
       <div class="up-info"><div class="nm">${esc(t.name)}</div></div>
     </div>`;
   }).join('');
