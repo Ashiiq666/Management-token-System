@@ -108,6 +108,21 @@ nav { flex: 1; padding: 14px 12px; }
 .btn-ghost { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); }
 [data-theme="dark"] .btn-success { color: #04140a; }
 
+/* VIP */
+.vip-card { background: var(--bg-card); border: 1.5px solid #f59e0b; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); margin-bottom: 18px; overflow: hidden; }
+.vip-head { padding: 14px 18px; background: #fffbeb; color: #b45309; font-size: 15px; font-weight: 800; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #fde68a; }
+[data-theme="dark"] .vip-head { background: #422006; color: #fbbf24; border-bottom-color: #713f12; }
+.vip-head i { color: #f59e0b; }
+.vip-list { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.vip-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--radius-md); border: 1px solid #fde68a; background: #fffbeb; }
+[data-theme="dark"] .vip-item { background: #2a1a05; border-color: #713f12; }
+.vip-item.first { box-shadow: 0 0 0 1.5px #f59e0b; }
+.vip-item .q-tok { color: #b45309; }
+[data-theme="dark"] .vip-item .q-tok { color: #fbbf24; }
+.vip-tag { display: inline-block; background: #f59e0b; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .5px; padding: 1px 6px; border-radius: 4px; vertical-align: middle; }
+.star-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 22px; display: inline-flex; padding: 4px; transition: transform .1s, color .15s; }
+.star-btn:hover { color: #f59e0b; transform: scale(1.15); }
+.star-btn.on { color: #f59e0b; }
 .call-next { width: 100%; height: 64px; border: none; border-radius: var(--radius-lg); background: var(--brand); color: #fff; font-size: 18px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 12px; box-shadow: var(--shadow-md); margin-bottom: 22px; transition: transform .1s, opacity .15s; }
 [data-theme="dark"] .call-next { color: #04141a; }
 .call-next:active { transform: scale(.99); }
@@ -266,6 +281,11 @@ td .tok { font-weight: 800; color: var(--brand); }
         <div class="cur-actions" id="curActions"></div>
       </div>
 
+      <div class="vip-card" id="vipCard" style="display:none">
+        <div class="vip-head"><span><i class="ti ti-star-filled"></i> VIP Queue — served next</span><span class="cnt" id="vipCount">0</span></div>
+        <div class="vip-list" id="vipBody"></div>
+      </div>
+
       <button class="call-next" id="callNextBtn"><i class="ti ti-player-play-filled"></i> Call Next Token</button>
 
       <div class="cols">
@@ -297,7 +317,7 @@ td .tok { font-weight: 800; color: var(--brand); }
         <button class="btn btn-ghost" id="exportBtn"><i class="ti ti-download"></i> Export CSV</button>
       </div>
       <table>
-        <thead><tr><th>Token</th><th>Name</th><th>Phone</th><th>Purpose</th><th>Status</th><th>Registered</th></tr></thead>
+        <thead><tr><th>Token</th><th>Name</th><th>Phone</th><th>Purpose</th><th>Status</th><th>Registered</th><th>VIP</th></tr></thead>
         <tbody id="regBody"></tbody>
       </table>
     </section>
@@ -380,12 +400,12 @@ const stateRef = firebase.database().ref('state');
 // Region-based: uses whatever timezone the device is set to (Dubai → Dubai, London → London)
 function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date()); }
 function localTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}); }
-function freshState(name){ return { date: localDay(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
+function freshState(name){ return { date: localDay(), nextId:1, tokens:[], queue:[], pending:[], vip:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
 // Firebase can return arrays as objects (with integer keys) — coerce back to a real array.
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function normalize(s){
   if(!s || s.date !== localDay()) return freshState(s && s.hospitalName);
-  s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending);
+  s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending); s.vip=toArr(s.vip);
   if(s.currentToken===undefined) s.currentToken=null;
   s.nextId=s.nextId||1; s.servedCount=s.servedCount||0;
   s.hospitalName=s.hospitalName||CONFIG.hospitalName;
@@ -422,13 +442,27 @@ tick(); setInterval(tick,1000);
 let state = null;
 function applyOp(s, op, d){
   if(op==='call-next'){
-    if(s.currentToken!=null){ const cur=findTok(s,s.currentToken); if(cur && cur.status==='serving'){ cur.status='done'; cur.doneAt=localTime(); s.servedCount++; } }
-    if(s.queue.length===0){ s.currentToken=null; }
-    else { const nid=s.queue.shift(); const t=findTok(s,nid); if(t){ t.status='serving'; t.calledAt=localTime(); } s.currentToken=nid; }
+    if(s.currentToken!=null){ const cur=findTok(s,s.currentToken); if(cur && cur.status==='serving'){ cur.status='done'; cur.doneAt=localTime(); s.servedCount++; cur.isVip=false; } }
+    // VIP queue interrupts: serve any starred VIP first, then resume normal order
+    let nid = null;
+    if(s.vip.length) nid = s.vip.shift();
+    else if(s.queue.length) nid = s.queue.shift();
+    if(nid==null){ s.currentToken=null; }
+    else { const t=findTok(s,nid); if(t){ t.status='serving'; t.calledAt=localTime(); } s.currentToken=nid; }
   } else if(op==='mark-done'){
-    if(s.currentToken!=null){ const t=findTok(s,s.currentToken); if(t){ t.status='done'; t.doneAt=localTime(); s.servedCount++; } s.currentToken=null; }
+    if(s.currentToken!=null){ const t=findTok(s,s.currentToken); if(t){ t.status='done'; t.doneAt=localTime(); s.servedCount++; t.isVip=false; } s.currentToken=null; }
   } else if(op==='skip-current'){
-    if(s.currentToken!=null){ const t=findTok(s,s.currentToken); if(t){ t.status='pending'; if(!s.pending.includes(t.id)) s.pending.push(t.id); } s.currentToken=null; }
+    if(s.currentToken!=null){ const t=findTok(s,s.currentToken); if(t){ t.status='pending'; t.isVip=false; if(!s.pending.includes(t.id)) s.pending.push(t.id); } s.currentToken=null; }
+  } else if(op==='vip-add'){
+    const t=findTok(s,d.id);
+    if(t && (t.status==='waiting' || t.status==='pending')){
+      s.queue=s.queue.filter(x=>x!==d.id); s.pending=s.pending.filter(x=>x!==d.id);
+      if(!s.vip.includes(d.id)) s.vip.push(d.id);
+      t.isVip=true; t.status='waiting';
+    }
+  } else if(op==='vip-remove'){
+    s.vip=s.vip.filter(x=>x!==d.id);
+    const t=findTok(s,d.id); if(t){ t.isVip=false; if(t.status==='waiting' && !s.queue.includes(d.id)) s.queue.push(d.id); }
   } else if(op==='skip-queued'){
     s.queue=s.queue.filter(x=>x!==d.id); const t=findTok(s,d.id); if(t){ t.status='pending'; if(!s.pending.includes(d.id)) s.pending.push(d.id); }
   } else if(op==='reinsert'){
@@ -525,15 +559,18 @@ document.getElementById('displayLink').onclick = () => window.open('../display-a
 /* ---- Queue actions (atomic Firebase transactions) ---- */
 document.getElementById('callNextBtn').onclick = async () => {
   if (!state) return;
-  const hadQueue = state.queue.length > 0;
+  const hadAnyone = state.queue.length > 0 || state.vip.length > 0;
+  const wasVip = state.vip.length > 0;
   const ns = await op('call-next');
   if (!ns) return;
-  if (ns.currentToken != null) { chime(); flashCurrent(); toast('Now serving token ' + String(ns.currentToken).padStart(2,'0')); }
-  else toast(hadQueue ? 'Queue is empty' : 'No one waiting');
+  if (ns.currentToken != null) { chime(); flashCurrent(); toast((wasVip?'★ Now serving VIP token ':'Now serving token ') + String(ns.currentToken).padStart(2,'0')); }
+  else toast(hadAnyone ? 'Queue is empty' : 'No one waiting');
 };
 async function markDone(){ if (await op('mark-done')) toast('Marked as done'); }
 async function skipCurrent(){ if (await op('skip-current')) toast('Token moved to pending'); }
 async function skipQueued(id){ if (await op('skip-queued', { id })) toast('Skipped to pending'); }
+async function vipAdd(id){ if (await op('vip-add', { id })) toast('★ Added to VIP queue'); }
+async function vipRemove(id){ if (await op('vip-remove', { id })) toast('Removed from VIP queue'); }
 
 /* ---- Re-insert ---- */
 function openReinsert(id){
@@ -618,6 +655,28 @@ function render(){
     </div>`;
   }).join('');
 
+  // VIP queue
+  const vipCard = document.getElementById('vipCard');
+  document.getElementById('vipCount').textContent = s.vip.length;
+  if (!s.vip.length) { vipCard.style.display = 'none'; }
+  else {
+    vipCard.style.display = 'block';
+    document.getElementById('vipBody').innerHTML = s.vip.map((id,i)=>{
+      const t = s.tokens.find(x=>x.id===id); if(!t) return '';
+      return `<div class="vip-item ${i===0?'first':''}">
+        <div class="q-tok">${String(t.id).padStart(2,'0')}</div>
+        <div class="q-mid"><div class="nm">${esc(t.name)} ${i===0?'<span class="upnext-tag" style="color:#b45309">• next</span>':''}</div>
+          <div class="sub"><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span><span>${t.registeredAt}</span></div></div>
+        <button class="btn btn-ghost" onclick="vipRemove(${t.id})"><i class="ti ti-star-off"></i> Remove</button>
+      </div>`;
+    }).join('');
+  }
+
+  // Call Next button reflects whether a VIP is up next
+  const cn = document.getElementById('callNextBtn');
+  if (s.vip.length) cn.innerHTML = `<i class="ti ti-star-filled"></i> Call VIP Token ${String(s.vip[0]).padStart(2,'0')}`;
+  else cn.innerHTML = `<i class="ti ti-player-play-filled"></i> Call Next Token`;
+
   renderTable();
   renderFeedback();
 }
@@ -640,13 +699,21 @@ function renderTable(){
     return true;
   });
   const tb = document.getElementById('regBody');
-  if (!rows.length){ tb.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:30px">No matching registrations</td></tr>`; return; }
-  tb.innerHTML = rows.map(t=>`<tr>
-    <td><span class="tok">${String(t.id).padStart(2,'0')}</span></td>
-    <td>${esc(t.name)}</td><td>${esc(t.phone)}</td>
-    <td><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span></td>
-    <td><span class="st ${t.status}">${t.status}</span></td>
-    <td>${t.registeredAt}</td></tr>`).join('');
+  if (!rows.length){ tb.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:30px">No matching registrations</td></tr>`; return; }
+  tb.innerHTML = rows.map(t=>{
+    // Star toggle only for people still in the queue (waiting/pending), not serving/done
+    const canVip = (t.status==='waiting' || t.status==='pending');
+    const star = t.isVip
+      ? `<button class="star-btn on" title="Remove from VIP" onclick="vipRemove(${t.id})"><i class="ti ti-star-filled"></i></button>`
+      : (canVip ? `<button class="star-btn" title="Add to VIP queue" onclick="vipAdd(${t.id})"><i class="ti ti-star"></i></button>` : `<span style="color:var(--text-muted)">—</span>`);
+    return `<tr>
+      <td><span class="tok">${String(t.id).padStart(2,'0')}</span></td>
+      <td>${esc(t.name)} ${t.isVip?'<span class="vip-tag">VIP</span>':''}</td><td>${esc(t.phone)}</td>
+      <td><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span></td>
+      <td><span class="st ${t.status}">${t.status}</span></td>
+      <td>${t.registeredAt}</td>
+      <td>${star}</td></tr>`;
+  }).join('');
 }
 ['searchInp','filterPurpose','filterStatus'].forEach(id=>document.getElementById(id).addEventListener('input', renderTable));
 

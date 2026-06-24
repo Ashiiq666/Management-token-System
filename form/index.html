@@ -381,12 +381,12 @@ const stateRef = firebase.database().ref('state');
 // Region-based: uses whatever timezone the device is set to (Dubai → Dubai, London → London)
 function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date()); }
 function localTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}); }
-function freshState(name){ return { date: localDay(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
+function freshState(name){ return { date: localDay(), nextId:1, tokens:[], queue:[], pending:[], vip:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
 // Firebase can return arrays as objects (with integer keys) — coerce back to a real array.
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function normalize(s){
   if(!s || s.date !== localDay()) return freshState(s && s.hospitalName);
-  s.tokens = toArr(s.tokens); s.queue = toArr(s.queue); s.pending = toArr(s.pending);
+  s.tokens = toArr(s.tokens); s.queue = toArr(s.queue); s.pending = toArr(s.pending); s.vip = toArr(s.vip);
   if(s.currentToken === undefined) s.currentToken = null;
   s.nextId = s.nextId || 1; s.servedCount = s.servedCount || 0;
   s.hospitalName = s.hospitalName || CONFIG.hospitalName;
