@@ -132,15 +132,6 @@ header {
   </div>
 </div>
 
-<!-- IDLE -->
-<div class="idle" id="idle">
-  <div class="ring"><i class="ti ti-plane-tilt"></i></div>
-  <h2 id="idleName">Fly Dubai</h2>
-  <div class="iclock" id="idleClock">--:--</div>
-  <div class="idate" id="idleDate">—</div>
-  <div class="hint">SYSTEM IDLE · WAITING FOR ACTIVITY</div>
-</div>
-
 <script>
 const CONFIG = {
   hospitalName: "Fly Dubai",
@@ -159,10 +150,11 @@ const CONFIG = {
 const FIREBASE_DB_URL = "https://flydubai-17161-default-rtdb.asia-southeast1.firebasedatabase.app";
 firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
 const stateRef = firebase.database().ref('state');
-function dubaiToday(){ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dubai'}).format(new Date()); }
+// Region-based: uses whatever timezone the device is set to
+function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date()); }
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function normalize(s){
-  if(!s || s.date !== dubaiToday()) return { date:dubaiToday(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName:(s&&s.hospitalName)||CONFIG.hospitalName };
+  if(!s || s.date !== localDay()) return { date:localDay(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName:(s&&s.hospitalName)||CONFIG.hospitalName };
   s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending);
   if(s.currentToken===undefined) s.currentToken=null;
   s.hospitalName=s.hospitalName||CONFIG.hospitalName;
@@ -173,16 +165,12 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;',
 function pad(n){ return String(n).padStart(2,'0'); }
 
 document.getElementById('hospName').textContent = CONFIG.hospitalName;
-document.getElementById('idleName').textContent = CONFIG.hospitalName;
 
 /* Clock */
-const TZ = 'Asia/Dubai';
 function tick(){
   const d = new Date();
-  document.getElementById('clock').textContent = d.toLocaleTimeString('en-US',{hour12:false,timeZone:TZ});
-  document.getElementById('date').textContent = d.toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:TZ}).toUpperCase();
-  document.getElementById('idleClock').textContent = d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:TZ});
-  document.getElementById('idleDate').textContent = d.toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long',timeZone:TZ}).toUpperCase();
+  document.getElementById('clock').textContent = d.toLocaleTimeString('en-US',{hour12:false});
+  document.getElementById('date').textContent = d.toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).toUpperCase();
 }
 tick(); setInterval(tick,1000);
 
@@ -230,23 +218,25 @@ function render(s){
 
   const name = s.hospitalName || CONFIG.hospitalName;
   document.getElementById('hospName').textContent = name;
-  document.getElementById('idleName').textContent = name;
-  resetIdle();
 }
 
-/* Idle */
-let idleTimer;
-const IDLE_MS = 10*60*1000;
-function resetIdle(){
-  document.getElementById('idle').classList.remove('show');
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(()=>document.getElementById('idle').classList.add('show'), IDLE_MS);
+/* Keep the screen awake 24/7 — never sleep (re-acquire if the OS releases it) */
+let wakeLock = null;
+async function keepAwake(){
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  } catch(e){ /* ignore — falls back to OS settings */ }
 }
-['keydown','mousemove','click','touchstart'].forEach(ev=>window.addEventListener(ev, resetIdle));
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
+keepAwake();
+// Re-try periodically in case the lock was dropped
+setInterval(() => { if (wakeLock === null) keepAwake(); }, 30000);
 
 /* Live updates straight from Firebase — instant, no polling */
 stateRef.on('value', snap => render(normalize(snap.val())));
-resetIdle();
 </script>
 </body>
 </html>

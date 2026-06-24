@@ -363,13 +363,14 @@ const CONFIG = {
 const FIREBASE_DB_URL = "https://flydubai-17161-default-rtdb.asia-southeast1.firebasedatabase.app";
 firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
 const stateRef = firebase.database().ref('state');
-function dubaiToday(){ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dubai'}).format(new Date()); }
-function dubaiTime(){ return new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Dubai',hour:'numeric',minute:'2-digit',hour12:true}).format(new Date()); }
-function freshState(name){ return { date: dubaiToday(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
+// Region-based: uses whatever timezone the device is set to (Dubai → Dubai, London → London)
+function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date()); }
+function localTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}); }
+function freshState(name){ return { date: localDay(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
 // Firebase can return arrays as objects (with integer keys) — coerce back to a real array.
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function normalize(s){
-  if(!s || s.date !== dubaiToday()) return freshState(s && s.hospitalName);
+  if(!s || s.date !== localDay()) return freshState(s && s.hospitalName);
   s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending);
   if(s.currentToken===undefined) s.currentToken=null;
   s.nextId=s.nextId||1; s.servedCount=s.servedCount||0;
@@ -398,8 +399,8 @@ function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${String(d.g
 function fmtTime(d){ let h=d.getHours(),m=d.getMinutes(); const ap=h>=12?'PM':'AM'; h=h%12||12; return `${h}:${String(m).padStart(2,'0')} ${ap}`; }
 function tick(){
   const d=new Date();
-  document.getElementById('sbClock').textContent = d.toLocaleTimeString('en-US',{hour12:true,timeZone:'Asia/Dubai'});
-  document.getElementById('sbDate').textContent = d.toLocaleDateString('en-US',{weekday:'short',day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Dubai'});
+  document.getElementById('sbClock').textContent = d.toLocaleTimeString('en-US',{hour12:true});
+  document.getElementById('sbDate').textContent = d.toLocaleDateString('en-US',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
 }
 tick(); setInterval(tick,1000);
 
@@ -407,11 +408,11 @@ tick(); setInterval(tick,1000);
 let state = null;
 function applyOp(s, op, d){
   if(op==='call-next'){
-    if(s.currentToken!=null){ const cur=findTok(s,s.currentToken); if(cur && cur.status==='serving'){ cur.status='done'; cur.doneAt=dubaiTime(); s.servedCount++; } }
+    if(s.currentToken!=null){ const cur=findTok(s,s.currentToken); if(cur && cur.status==='serving'){ cur.status='done'; cur.doneAt=localTime(); s.servedCount++; } }
     if(s.queue.length===0){ s.currentToken=null; }
-    else { const nid=s.queue.shift(); const t=findTok(s,nid); if(t){ t.status='serving'; t.calledAt=dubaiTime(); } s.currentToken=nid; }
+    else { const nid=s.queue.shift(); const t=findTok(s,nid); if(t){ t.status='serving'; t.calledAt=localTime(); } s.currentToken=nid; }
   } else if(op==='mark-done'){
-    if(s.currentToken!=null){ const t=findTok(s,s.currentToken); if(t){ t.status='done'; t.doneAt=dubaiTime(); s.servedCount++; } s.currentToken=null; }
+    if(s.currentToken!=null){ const t=findTok(s,s.currentToken); if(t){ t.status='done'; t.doneAt=localTime(); s.servedCount++; } s.currentToken=null; }
   } else if(op==='skip-current'){
     if(s.currentToken!=null){ const t=findTok(s,s.currentToken); if(t){ t.status='pending'; if(!s.pending.includes(t.id)) s.pending.push(t.id); } s.currentToken=null; }
   } else if(op==='skip-queued'){

@@ -371,13 +371,14 @@ const FIREBASE_DB_URL = "https://flydubai-17161-default-rtdb.asia-southeast1.fir
 firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
 const stateRef = firebase.database().ref('state');
 
-function dubaiToday(){ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dubai'}).format(new Date()); }
-function dubaiTime(){ return new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Dubai',hour:'numeric',minute:'2-digit',hour12:true}).format(new Date()); }
-function freshState(name){ return { date: dubaiToday(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
+// Region-based: uses whatever timezone the device is set to (Dubai → Dubai, London → London)
+function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date()); }
+function localTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}); }
+function freshState(name){ return { date: localDay(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
 // Firebase can return arrays as objects (with integer keys) — coerce back to a real array.
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function normalize(s){
-  if(!s || s.date !== dubaiToday()) return freshState(s && s.hospitalName);
+  if(!s || s.date !== localDay()) return freshState(s && s.hospitalName);
   s.tokens = toArr(s.tokens); s.queue = toArr(s.queue); s.pending = toArr(s.pending);
   if(s.currentToken === undefined) s.currentToken = null;
   s.nextId = s.nextId || 1; s.servedCount = s.servedCount || 0;
@@ -402,7 +403,7 @@ initTheme();
 document.getElementById('hospName').textContent = CONFIG.hospitalName;
 
 /* ---------- Clock (Dubai time) ---------- */
-function tick() { document.getElementById('clock').textContent = dubaiTime(); }
+function tick() { document.getElementById('clock').textContent = localTime(); }
 tick(); setInterval(tick, 1000);
 
 /* ---------- Register a complaint (atomic Firebase transaction) ---------- */
@@ -415,7 +416,7 @@ function registerComplaint(payload) {
         id: s.nextId, cuid,
         name: payload.name, phone: payload.phone, purpose: payload.purpose,
         feedback: payload.feedback || '', feedbackType: payload.feedbackType || '',
-        status: 'waiting', registeredAt: dubaiTime(),
+        status: 'waiting', registeredAt: localTime(),
         calledAt: null, doneAt: null, reviewed: false
       };
       s.tokens.push(t);
