@@ -214,7 +214,7 @@ function render(s){
   // up next (3)
   const list = document.getElementById('upnextList');
   const upcoming = s.queue.slice(0,3);
-  if (!upcoming.length) list.innerHTML = `<div class="up-empty">No patients waiting</div>`;
+  if (!upcoming.length) list.innerHTML = `<div class="up-empty">No one waiting</div>`;
   else list.innerHTML = upcoming.map((id,i)=>{
     const t = s.tokens.find(x=>x.id===id);
     return `<div class="up-card ${i===0?'first':''}">

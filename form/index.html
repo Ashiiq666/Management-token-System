@@ -535,7 +535,7 @@ function showConfirm(token, ahead) {
 
   const aheadCount = ahead < 0 ? 0 : ahead;
   document.getElementById('waitInfo').innerHTML =
-    aheadCount === 0 ? `You're <strong>next</strong> in line!` : `<strong>${aheadCount}</strong> patient${aheadCount>1?'s':''} ahead of you.`;
+    aheadCount === 0 ? `You're <strong>next</strong> in line!` : `<strong>${aheadCount}</strong> ${aheadCount>1?'people':'person'} ahead of you.`;
 }
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
