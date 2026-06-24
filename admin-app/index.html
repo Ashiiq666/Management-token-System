@@ -9,6 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <style>
 :root {
   --brand: #0e7490; --brand-light: #e0f7fa; --brand-dark: #065b72;
@@ -357,11 +359,22 @@ const CONFIG = {
   adminPassword: "Amal123"
 };
 
-/* ---- Backend API base ----
-   Local (served by server.py): same origin. Hosted on Vercel: set to your Render backend URL. */
-const API_BASE = (location.protocol === 'file:' || /^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname))
-  ? '' : 'https://flydubai-complaint-queue.onrender.com';
-const channel = new BroadcastChannel(CONFIG.broadcastChannel);
+/* ---- Firebase: shared, always-free, real-time database ---- */
+const FIREBASE_DB_URL = "https://flydubai-17161-default-rtdb.asia-southeast1.firebasedatabase.app";
+firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
+const stateRef = firebase.database().ref('state');
+function dubaiToday(){ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dubai'}).format(new Date()); }
+function dubaiTime(){ return new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Dubai',hour:'numeric',minute:'2-digit',hour12:true}).format(new Date()); }
+function freshState(name){ return { date: dubaiToday(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
+function normalize(s){
+  if(!s || s.date !== dubaiToday()) return freshState(s && s.hospitalName);
+  s.tokens=s.tokens||[]; s.queue=s.queue||[]; s.pending=s.pending||[];
+  if(s.currentToken===undefined) s.currentToken=null;
+  s.nextId=s.nextId||1; s.servedCount=s.servedCount||0;
+  s.hospitalName=s.hospitalName||CONFIG.hospitalName;
+  return s;
+}
+function findTok(s, id){ return s.tokens.find(t => t.id === id); }
 const purposeLabel = id => (CONFIG.purposes.find(p => p.id === id) || {label:id}).label;
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
@@ -388,31 +401,42 @@ function tick(){
 }
 tick(); setInterval(tick,1000);
 
-/* ---- State (shared server) ---- */
-let state = null;           // authoritative state fetched from the server
-let serverDown = false;
-async function refresh(){
-  try {
-    const r = await fetch(API_BASE + '/api/state', { cache: 'no-store' });
-    state = await r.json();
-    serverDown = false;
-    applyName(state.hospitalName || CONFIG.hospitalName);
-    if (document.getElementById('app').style.display !== 'none') render();
-  } catch(e){
-    if (!serverDown) { serverDown = true; toast('⚠ Reconnecting to server…'); }
+/* ---- State (live from Firebase) ---- */
+let state = null;
+function applyOp(s, op, d){
+  if(op==='call-next'){
+    if(s.currentToken!=null){ const cur=findTok(s,s.currentToken); if(cur && cur.status==='serving'){ cur.status='done'; cur.doneAt=dubaiTime(); s.servedCount++; } }
+    if(s.queue.length===0){ s.currentToken=null; }
+    else { const nid=s.queue.shift(); const t=findTok(s,nid); if(t){ t.status='serving'; t.calledAt=dubaiTime(); } s.currentToken=nid; }
+  } else if(op==='mark-done'){
+    if(s.currentToken!=null){ const t=findTok(s,s.currentToken); if(t){ t.status='done'; t.doneAt=dubaiTime(); s.servedCount++; } s.currentToken=null; }
+  } else if(op==='skip-current'){
+    if(s.currentToken!=null){ const t=findTok(s,s.currentToken); if(t){ t.status='pending'; if(!s.pending.includes(t.id)) s.pending.push(t.id); } s.currentToken=null; }
+  } else if(op==='skip-queued'){
+    s.queue=s.queue.filter(x=>x!==d.id); const t=findTok(s,d.id); if(t){ t.status='pending'; if(!s.pending.includes(d.id)) s.pending.push(d.id); }
+  } else if(op==='reinsert'){
+    s.pending=s.pending.filter(x=>x!==d.id); const t=findTok(s,d.id); if(t) t.status='waiting';
+    if(d.mode==='next'||d.mode==='after') s.queue.unshift(d.id);
+    else if(d.mode==='pos'){ const idx=Math.max(0,Math.min(s.queue.length,(parseInt(d.pos,10)||1)-1)); s.queue.splice(idx,0,d.id); }
+    else s.queue.push(d.id);
+  } else if(op==='mark-reviewed'){
+    const t=findTok(s,d.id); if(t) t.reviewed=true;
+  } else if(op==='set-name'){
+    if(d.name) s.hospitalName=d.name;
+  } else if(op==='reset'){
+    return freshState(s.hospitalName);
   }
+  return s;
 }
-async function op(name, extra){
-  try {
-    const r = await fetch(API_BASE + '/api/op', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(Object.assign({ op:name }, extra||{}))
-    });
-    state = await r.json();
-    applyName(state.hospitalName || CONFIG.hospitalName);
-    render();
-    return true;
-  } catch(e){ toast('⚠ Action failed — check server'); return false; }
+// Run an action as an atomic Firebase transaction. Resolves the new state, or null on failure.
+function op(name, extra){
+  return new Promise(resolve => {
+    stateRef.transaction(cur => applyOp(normalize(cur), name, extra || {}),
+      (err, committed, snap) => {
+        if (err || !committed) { toast('⚠ Action failed — check your connection'); resolve(null); }
+        else resolve(normalize(snap.val()));
+      });
+  });
 }
 
 /* ---- PIN ---- */
@@ -447,12 +471,19 @@ function chime(){
 }
 
 /* ---- Boot ---- */
-async function boot(){
+let nameInitialized = false;
+function boot(){
   buildPurposeFilter();
-  await refresh();
-  if (state) document.getElementById('setName').value = state.hospitalName || CONFIG.hospitalName;
-  render();
-  setInterval(refresh, 1500); // live sync with phones / TV
+  // Live, instant updates straight from Firebase (no polling)
+  stateRef.on('value', snap => {
+    state = normalize(snap.val());
+    applyName(state.hospitalName || CONFIG.hospitalName);
+    const setNameEl = document.getElementById('setName');
+    if (!nameInitialized && document.activeElement !== setNameEl) {
+      setNameEl.value = state.hospitalName || CONFIG.hospitalName; nameInitialized = true;
+    }
+    render();
+  });
 }
 function applyName(name){
   CONFIG.hospitalName = name;
@@ -472,15 +503,15 @@ document.querySelectorAll('.nav-item').forEach(it => {
   };
 });
 document.getElementById('menuBtn').onclick = () => document.getElementById('sidebar').classList.toggle('open');
-document.getElementById('displayLink').onclick = () => window.open('display.html','_blank');
+document.getElementById('displayLink').onclick = () => window.open('../display-app/','_blank');
 
-/* ---- Queue actions (all server-side) ---- */
+/* ---- Queue actions (atomic Firebase transactions) ---- */
 document.getElementById('callNextBtn').onclick = async () => {
   if (!state) return;
   const hadQueue = state.queue.length > 0;
-  const ok = await op('call-next');
-  if (!ok) return;
-  if (state.currentToken != null) { chime(); flashCurrent(); toast('Now serving token ' + String(state.currentToken).padStart(2,'0')); }
+  const ns = await op('call-next');
+  if (!ns) return;
+  if (ns.currentToken != null) { chime(); flashCurrent(); toast('Now serving token ' + String(ns.currentToken).padStart(2,'0')); }
   else toast(hadQueue ? 'Queue is empty' : 'No one waiting');
 };
 async function markDone(){ if (await op('mark-done')) toast('Marked as done'); }
@@ -678,7 +709,7 @@ document.getElementById('modalBg').addEventListener('click', e=>{ if(e.target.id
 let toastTimer;
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200); }
 
-/* Live sync is handled by polling /api/state in boot() */
+/* Live sync is handled by the Firebase listener in boot() */
 </script>
 </body>
 </html>

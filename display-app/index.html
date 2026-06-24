@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <style>
 :root {
   --brand: #22d3ee; --brand2: #38bdf8;
@@ -153,11 +155,18 @@ const CONFIG = {
   broadcastChannel: "hospital-token-channel"
 };
 
-/* ---- Backend API base ----
-   Local (served by server.py): same origin. Hosted on Vercel: set to your Render backend URL. */
-const API_BASE = (location.protocol === 'file:' || /^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname))
-  ? '' : 'https://flydubai-complaint-queue.onrender.com';
-const channel = new BroadcastChannel(CONFIG.broadcastChannel);
+/* ---- Firebase: shared, always-free, real-time database ---- */
+const FIREBASE_DB_URL = "https://flydubai-17161-default-rtdb.asia-southeast1.firebasedatabase.app";
+firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
+const stateRef = firebase.database().ref('state');
+function dubaiToday(){ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dubai'}).format(new Date()); }
+function normalize(s){
+  if(!s || s.date !== dubaiToday()) return { date:dubaiToday(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName:(s&&s.hospitalName)||CONFIG.hospitalName };
+  s.tokens=s.tokens||[]; s.queue=s.queue||[]; s.pending=s.pending||[];
+  if(s.currentToken===undefined) s.currentToken=null;
+  s.hospitalName=s.hospitalName||CONFIG.hospitalName;
+  return s;
+}
 const purposeLabel = id => (CONFIG.purposes.find(p=>p.id===id)||{label:id}).label;
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function pad(n){ return String(n).padStart(2,'0'); }
@@ -234,17 +243,8 @@ function resetIdle(){
 }
 ['keydown','mousemove','click','touchstart'].forEach(ev=>window.addEventListener(ev, resetIdle));
 
-/* Poll the shared server; only re-render (and reset idle) when something changed */
-let lastSnapshot = '';
-async function poll(){
-  try {
-    const r = await fetch(API_BASE + '/api/state', { cache:'no-store' });
-    const txt = await r.text();
-    if (txt !== lastSnapshot){ lastSnapshot = txt; render(JSON.parse(txt)); }
-  } catch(e){ /* server unreachable — keep last view */ }
-}
-poll();
-setInterval(poll, 1500);
+/* Live updates straight from Firebase — instant, no polling */
+stateRef.on('value', snap => render(normalize(snap.val())));
 resetIdle();
 </script>
 </body>

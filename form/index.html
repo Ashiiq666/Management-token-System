@@ -12,6 +12,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <style>
 :root {
   --brand: #0e7490;
@@ -364,11 +366,22 @@ const CONFIG = {
   adminPassword: "admin123"
 };
 
-/* ---- Backend API base ----
-   Local (served by server.py on your machine/Wi-Fi): same origin.
-   Hosted on Vercel: set this to your Render backend URL. */
-const API_BASE = (location.protocol === 'file:' || /^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname))
-  ? '' : 'https://flydubai-complaint-queue.onrender.com';
+/* ---- Firebase: shared, always-free, real-time database ---- */
+const FIREBASE_DB_URL = "https://flydubai-17161-default-rtdb.asia-southeast1.firebasedatabase.app";
+firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
+const stateRef = firebase.database().ref('state');
+
+function dubaiToday(){ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dubai'}).format(new Date()); }
+function dubaiTime(){ return new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Dubai',hour:'numeric',minute:'2-digit',hour12:true}).format(new Date()); }
+function freshState(name){ return { date: dubaiToday(), nextId:1, tokens:[], queue:[], pending:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
+function normalize(s){
+  if(!s || s.date !== dubaiToday()) return freshState(s && s.hospitalName);
+  s.tokens = s.tokens || []; s.queue = s.queue || []; s.pending = s.pending || [];
+  if(s.currentToken === undefined) s.currentToken = null;
+  s.nextId = s.nextId || 1; s.servedCount = s.servedCount || 0;
+  s.hospitalName = s.hospitalName || CONFIG.hospitalName;
+  return s;
+}
 
 /* ---------- Theme ---------- */
 function initTheme() {
@@ -395,24 +408,32 @@ function fmtTime(d) {
 function tick() { document.getElementById('clock').textContent = fmtTime(new Date()); }
 tick(); setInterval(tick, 1000);
 
-/* ---------- Channel ---------- */
-const channel = new BroadcastChannel(CONFIG.broadcastChannel);
-
-/* ---------- State ---------- */
-function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+/* ---------- Register a complaint (atomic Firebase transaction) ---------- */
+function registerComplaint(payload) {
+  const cuid = 'c' + Date.now() + '-' + Math.floor(Math.random() * 1e6);
+  return new Promise((resolve, reject) => {
+    stateRef.transaction(cur => {
+      const s = normalize(cur);
+      const t = {
+        id: s.nextId, cuid,
+        name: payload.name, phone: payload.phone, purpose: payload.purpose,
+        feedback: payload.feedback || '', feedbackType: payload.feedbackType || '',
+        status: 'waiting', registeredAt: dubaiTime(),
+        calledAt: null, doneAt: null, reviewed: false
+      };
+      s.tokens.push(t);
+      s.queue.push(t.id);
+      s.nextId = s.nextId + 1;
+      return s;
+    }, (err, committed, snap) => {
+      if (err || !committed) return reject(err || new Error('not committed'));
+      const s = normalize(snap.val());
+      const mine = s.tokens.find(x => x.cuid === cuid);
+      const ahead = mine ? s.queue.indexOf(mine.id) : 0;
+      resolve({ token: mine, ahead: ahead < 0 ? 0 : ahead });
+    });
+  });
 }
-function freshState() {
-  return { date: todayStr(), nextId: 1, tokens: [], queue: [], pending: [], currentToken: null, servedCount: 0 };
-}
-function getState() {
-  let s;
-  try { s = JSON.parse(localStorage.getItem(CONFIG.storageKey)); } catch(e) {}
-  if (!s || s.date !== todayStr()) { s = freshState(); saveState(s); }
-  return s;
-}
-function saveState(s) { localStorage.setItem(CONFIG.storageKey, JSON.stringify(s)); }
 
 /* ---------- Build issue-type dropdown ---------- */
 let selectedPurpose = null;
@@ -475,31 +496,14 @@ document.getElementById('regForm').addEventListener('submit', e => {
       feedback: ta.value.trim(),
       feedbackType: ta.value.trim() ? 'complaint' : ''
     };
-    // Try up to 3 times — the server may be waking from sleep (cold start ~30s)
-    const attempt = async () => {
-      const res = await fetch(API_BASE + '/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) throw new Error('bad response');
-      return res.json();
-    };
-    for (let i = 0; i < 3; i++) {
-      try {
-        const data = await attempt();
-        showConfirm(data.token, data.ahead);
-        return;
-      } catch (err) {
-        if (i < 2) {
-          document.getElementById('submitLabel').innerHTML = '<span class="spinner"></span> Connecting to server…';
-          await new Promise(r => setTimeout(r, 4000));
-        }
-      }
+    try {
+      const data = await registerComplaint(payload);
+      showConfirm(data.token, data.ahead);
+    } catch (err) {
+      btn.disabled = false;
+      document.getElementById('submitLabel').innerHTML = '<i class="ti ti-ticket"></i> Get My Token';
+      alert('Couldn’t reach the database. Please check your internet connection and try again.');
     }
-    btn.disabled = false;
-    document.getElementById('submitLabel').innerHTML = '<i class="ti ti-ticket"></i> Get My Token';
-    alert('Couldn’t reach the server. It may be waking up — please wait a moment and try again.');
   }, 600);
 });
 
@@ -550,10 +554,11 @@ document.getElementById('againLink').onclick = () => {
   window.scrollTo(0,0);
 };
 
-// Pull live hospital name from the shared server (falls back to CONFIG default)
-fetch(API_BASE + '/api/state').then(r => r.json()).then(s => {
+// Keep the organisation name in sync with whatever admin set
+stateRef.on('value', snap => {
+  const s = snap.val();
   if (s && s.hospitalName) document.getElementById('hospName').textContent = s.hospitalName;
-}).catch(() => {});
+});
 </script>
 </body>
 </html>

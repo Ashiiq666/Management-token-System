@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: flydubai-complaint-queue
-    runtime: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: python server.py
-    autoDeploy: true
