@@ -452,7 +452,7 @@ function applyOp(s, op, d){
     if(s.vip.length) nid = s.vip.shift();
     else if(s.queue.length) nid = s.queue.shift();
     if(nid==null){ s.currentToken=null; }
-    else { const t=findTok(s,nid); if(t){ t.status='serving'; t.calledAt=localTime(); } s.currentToken=nid; }
+    else { const t=findTok(s,nid); if(t){ t.status='serving'; t.calledAt=localTime(); t.calledTs=Date.now(); } s.currentToken=nid; }
   } else if(op==='mark-done'){
     if(s.currentToken!=null){ const t=findTok(s,s.currentToken); if(t){ t.status='done'; t.doneAt=localTime(); s.servedCount++; t.isVip=false; } s.currentToken=null; }
   } else if(op==='skip-current'){

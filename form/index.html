@@ -427,8 +427,8 @@ function registerComplaint(payload) {
         id: s.seq, no: s.nextNormal, cuid,   // internal id + reserved-aware display number (6+)
         name: payload.name, phone: payload.phone, purpose: payload.purpose,
         feedback: payload.feedback || '', feedbackType: payload.feedbackType || '',
-        status: 'waiting', registeredAt: localTime(),
-        calledAt: null, doneAt: null, reviewed: false, isVip: false
+        status: 'waiting', registeredAt: localTime(), registeredTs: Date.now(),
+        calledAt: null, calledTs: null, doneAt: null, reviewed: false, isVip: false
       };
       s.tokens.push(t);
       s.queue.push(t.id);
