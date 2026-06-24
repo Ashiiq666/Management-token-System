@@ -166,11 +166,12 @@ const stateRef = firebase.database().ref('state');
 // Region-based: uses whatever timezone the device is set to
 function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date()); }
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
+function toServingMap(v){ if(!v||typeof v!=='object') return {}; const o={}; if(Array.isArray(v)){ v.forEach((val,i)=>{ if(val!=null) o[i]=val; }); } else { Object.keys(v).forEach(k=>{ if(v[k]!=null) o[k]=v[k]; }); } return o; }
 function normalize(s){
   if(!s || s.date !== localDay()) return { date:localDay(), seq:1, nextNormal:6, counters:1, tokens:[], queue:[], pending:[], vip:[], serving:{}, servedCount:0, hospitalName:(s&&s.hospitalName)||CONFIG.hospitalName };
   s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending); s.vip=toArr(s.vip);
   s.counters = s.counters || 1;
-  if(!s.serving || typeof s.serving!=='object' || Array.isArray(s.serving)) s.serving = {};
+  s.serving = toServingMap(s.serving);
   if(s.currentToken!=null && Object.keys(s.serving).length===0) s.serving['1']=s.currentToken;
   s.hospitalName=s.hospitalName||CONFIG.hospitalName;
   s.tokens.forEach(t=>{ if(t.no==null) t.no=t.id; });

@@ -420,11 +420,19 @@ function localTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeri
 function freshState(name, counters){ return { date: localDay(), seq:1, nextNormal:6, nextVip:1, counters: counters||1, tokens:[], queue:[], pending:[], vip:[], serving:{}, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
 // Firebase can return arrays as objects (with integer keys) — coerce back to a real array.
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
+// Firebase stores {1:id,2:id} as an array [null,id,id]; coerce back to a counter→id map.
+function toServingMap(v){
+  if(!v || typeof v!=='object') return {};
+  const o={};
+  if(Array.isArray(v)){ v.forEach((val,i)=>{ if(val!=null) o[i]=val; }); }
+  else { Object.keys(v).forEach(k=>{ if(v[k]!=null) o[k]=v[k]; }); }
+  return o;
+}
 function normalize(s){
   if(!s || s.date !== localDay()) return freshState(s && s.hospitalName, s && s.counters);
   s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending); s.vip=toArr(s.vip);
   s.counters = s.counters || 1;
-  if(!s.serving || typeof s.serving!=='object' || Array.isArray(s.serving)) s.serving = {};
+  s.serving = toServingMap(s.serving);
   if(s.currentToken!=null && Object.keys(s.serving).length===0) s.serving['1']=s.currentToken; // migrate single→counter 1
   s.seq = s.seq || s.nextId || (s.tokens.length ? Math.max(...s.tokens.map(t=>t.id))+1 : 1);
   s.nextNormal = s.nextNormal || 6;
