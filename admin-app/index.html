@@ -91,16 +91,25 @@ nav { flex: 1; padding: 14px 12px; }
 .ic.b3 { background: var(--success-bg); color: var(--success); }
 .ic.b4 { background: var(--pending-bg); color: var(--pending); }
 
-/* Current token card */
-.current-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 22px; box-shadow: var(--shadow-sm); margin-bottom: 18px; display: flex; align-items: center; gap: 26px; flex-wrap: wrap; }
-.cur-num-box { text-align: center; min-width: 150px; }
-.cur-num-box .lbl { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; }
-.cur-num { font-size: 64px; font-weight: 900; color: var(--brand); line-height: 1; }
-.cur-num.flash { animation: tokenFlash .6s; }
-.cur-info { flex: 1; min-width: 200px; }
-.cur-info h3 { font-size: 20px; font-weight: 800; }
-.cur-info .meta { font-size: 13.5px; color: var(--text-secondary); margin-top: 4px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
-.cur-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+/* Counter cards (per-counter Now Serving) */
+.counters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 22px; }
+.counter-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; display: flex; flex-direction: column; }
+.counter-card.active { border-color: var(--brand); }
+.cc-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; font-weight: 800; }
+.cc-head i { color: var(--brand); }
+.cc-badge { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--bg-input); color: var(--text-secondary); }
+.cc-badge.on { background: var(--brand-light); color: var(--brand); }
+.cc-main { display: flex; align-items: center; gap: 18px; padding: 16px; }
+.cc-num { font-size: 52px; font-weight: 900; color: var(--text-muted); line-height: 1; min-width: 90px; text-align: center; }
+.cc-num.has { color: var(--brand); }
+.cc-info { flex: 1; min-width: 0; }
+.cc-name2 { font-size: 18px; font-weight: 800; }
+.cc-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 5px; }
+.cc-idle { color: var(--text-muted); font-size: 14px; font-weight: 600; }
+.cc-actions { display: flex; gap: 8px; padding: 0 16px 16px; flex-wrap: wrap; }
+.cc-call { flex: 1; justify-content: center; background: var(--brand); color: #fff; min-height: 44px; }
+[data-theme="dark"] .cc-call { color: #04141a; }
+.cc-call.vip-mode { background: linear-gradient(135deg,#f59e0b,#f97316); color: #fff; }
 .btn { border: none; border-radius: var(--radius-md); padding: 12px 18px; font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 7px; transition: opacity .15s, transform .1s; }
 .btn:active { transform: scale(.97); }
 .btn-success { background: var(--success); color: #fff; }
@@ -276,18 +285,12 @@ td .tok { font-weight: 800; color: var(--brand); }
         <div class="metric"><div class="ic b4"><i class="ti ti-checks"></i></div><div class="num" id="mDone">0</div><div class="lbl">Completed</div></div>
       </div>
 
-      <div class="current-card" id="currentCard">
-        <div class="cur-num-box"><div class="lbl">Now Serving</div><div class="cur-num" id="curNum">—</div></div>
-        <div class="cur-info" id="curInfo"><h3>No token being served</h3><div class="meta">Press "Call Next Token" to begin.</div></div>
-        <div class="cur-actions" id="curActions"></div>
-      </div>
-
       <div class="vip-card" id="vipCard" style="display:none">
         <div class="vip-head"><span><i class="ti ti-star-filled"></i> VIP Queue — served next</span><span class="cnt" id="vipCount">0</span></div>
         <div class="vip-list" id="vipBody"></div>
       </div>
 
-      <button class="call-next" id="callNextBtn"><i class="ti ti-player-play-filled"></i> Call Next Token</button>
+      <div class="counters-grid" id="countersGrid"></div>
 
       <div class="cols">
         <div class="panel">
@@ -344,6 +347,18 @@ td .tok { font-weight: 800; color: var(--brand); }
         <button class="btn btn-success" id="saveNameBtn"><i class="ti ti-check"></i> Save Name</button>
       </div>
       <div class="settings-card">
+        <h3>Service Counters</h3>
+        <p>How many counters are active. Each counter is called independently.</p>
+        <select id="counterSel" style="width:100%;height:46px;padding:0 14px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);border-radius:var(--radius-md);font-size:14px;font-family:inherit">
+          <option value="1">1 counter</option>
+          <option value="2">2 counters</option>
+          <option value="3">3 counters</option>
+          <option value="4">4 counters</option>
+          <option value="5">5 counters</option>
+          <option value="6">6 counters</option>
+        </select>
+      </div>
+      <div class="settings-card">
         <h3>QR Code Generator</h3>
         <p>Enter the complaint form URL. Users scan this to register a complaint.</p>
         <input type="text" id="qrUrl" placeholder="https://your-complaint-form.vercel.app">
@@ -398,13 +413,15 @@ const stateRef = firebase.database().ref('state');
 function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date()); }
 function localTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}); }
 // VIP token numbers 1–5 are reserved (assigned 1→5 in order, never reused); normal tokens start at 6.
-function freshState(name){ return { date: localDay(), seq:1, nextNormal:6, nextVip:1, tokens:[], queue:[], pending:[], vip:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
+function freshState(name, counters){ return { date: localDay(), seq:1, nextNormal:6, nextVip:1, counters: counters||1, tokens:[], queue:[], pending:[], vip:[], serving:{}, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
 // Firebase can return arrays as objects (with integer keys) — coerce back to a real array.
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function normalize(s){
-  if(!s || s.date !== localDay()) return freshState(s && s.hospitalName);
+  if(!s || s.date !== localDay()) return freshState(s && s.hospitalName, s && s.counters);
   s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending); s.vip=toArr(s.vip);
-  if(s.currentToken===undefined) s.currentToken=null;
+  s.counters = s.counters || 1;
+  if(!s.serving || typeof s.serving!=='object' || Array.isArray(s.serving)) s.serving = {};
+  if(s.currentToken!=null && Object.keys(s.serving).length===0) s.serving['1']=s.currentToken; // migrate single→counter 1
   s.seq = s.seq || s.nextId || (s.tokens.length ? Math.max(...s.tokens.map(t=>t.id))+1 : 1);
   s.nextNormal = s.nextNormal || 6;
   s.nextVip = s.nextVip || 1;
@@ -445,18 +462,24 @@ tick(); setInterval(tick,1000);
 /* ---- State (live from Firebase) ---- */
 let state = null;
 function applyOp(s, op, d){
+  const C = (d && d.counter!=null) ? String(d.counter) : '1';
   if(op==='call-next'){
-    if(s.currentToken!=null){ const cur=findTok(s,s.currentToken); if(cur && cur.status==='serving'){ cur.status='done'; cur.doneAt=localTime(); s.servedCount++; cur.isVip=false; } }
+    const curId = s.serving[C];
+    if(curId!=null){ const cur=findTok(s,curId); if(cur && cur.status==='serving'){ cur.status='done'; cur.doneAt=localTime(); s.servedCount++; cur.isVip=false; } }
     // VIP queue interrupts: serve any starred VIP first, then resume normal order
     let nid = null;
     if(s.vip.length) nid = s.vip.shift();
     else if(s.queue.length) nid = s.queue.shift();
-    if(nid==null){ s.currentToken=null; }
-    else { const t=findTok(s,nid); if(t){ t.status='serving'; t.calledAt=localTime(); t.calledTs=Date.now(); } s.currentToken=nid; }
+    if(nid==null){ s.serving[C]=null; }
+    else { const t=findTok(s,nid); if(t){ t.status='serving'; t.calledAt=localTime(); t.calledTs=Date.now(); t.counter=C; } s.serving[C]=nid; }
   } else if(op==='mark-done'){
-    if(s.currentToken!=null){ const t=findTok(s,s.currentToken); if(t){ t.status='done'; t.doneAt=localTime(); s.servedCount++; t.isVip=false; } s.currentToken=null; }
+    const curId=s.serving[C]; if(curId!=null){ const t=findTok(s,curId); if(t){ t.status='done'; t.doneAt=localTime(); s.servedCount++; t.isVip=false; } s.serving[C]=null; }
   } else if(op==='skip-current'){
-    if(s.currentToken!=null){ const t=findTok(s,s.currentToken); if(t){ t.status='pending'; t.isVip=false; if(!s.pending.includes(t.id)) s.pending.push(t.id); } s.currentToken=null; }
+    const curId=s.serving[C]; if(curId!=null){ const t=findTok(s,curId); if(t){ t.status='pending'; t.isVip=false; if(!s.pending.includes(curId)) s.pending.push(curId); } s.serving[C]=null; }
+  } else if(op==='set-counters'){
+    const n=Math.max(1,Math.min(6, parseInt(d.n,10)||1));
+    Object.keys(s.serving||{}).forEach(k=>{ if(parseInt(k,10)>n) delete s.serving[k]; });
+    s.counters=n;
   } else if(op==='vip-add'){
     const t=findTok(s,d.id);
     if(t && !t.isVip && (t.status==='waiting' || t.status==='pending')){
@@ -485,7 +508,7 @@ function applyOp(s, op, d){
   } else if(op==='set-name'){
     if(d.name) s.hospitalName=d.name;
   } else if(op==='reset'){
-    return freshState(s.hospitalName);
+    return freshState(s.hospitalName, s.counters);
   }
   return s;
 }
@@ -567,17 +590,18 @@ document.getElementById('menuBtn').onclick = () => document.getElementById('side
 document.getElementById('displayLink').onclick = () => window.open('../display-app/','_blank');
 
 /* ---- Queue actions (atomic Firebase transactions) ---- */
-document.getElementById('callNextBtn').onclick = async () => {
+async function callNext(counter){
   if (!state) return;
   const hadAnyone = state.queue.length > 0 || state.vip.length > 0;
-  const wasVip = state.vip.length > 0;
-  const ns = await op('call-next');
+  const ns = await op('call-next', { counter });
   if (!ns) return;
-  if (ns.currentToken != null) { const ct = ns.tokens.find(t=>t.id===ns.currentToken); chime(); flashCurrent(); toast(ct && ct.isVip ? ('★ Now serving VIP #' + String(ct.vipNo).padStart(2,'0') + ' (was #' + String(ct.no).padStart(2,'0') + ')') : ('Now serving token ' + String(ct?ct.no:ns.currentToken).padStart(2,'0'))); }
+  const id = ns.serving ? ns.serving[String(counter)] : null;
+  if (id != null) { const ct = ns.tokens.find(t=>t.id===id); chime(); toast((ct && ct.isVip ? ('★ VIP #' + String(ct.vipNo).padStart(2,'0')) : ('Token ' + String(ct?ct.no:id).padStart(2,'0'))) + ' → Counter ' + counter); }
   else toast(hadAnyone ? 'Queue is empty' : 'No one waiting');
-};
-async function markDone(){ if (await op('mark-done')) toast('Marked as done'); }
-async function skipCurrent(){ if (await op('skip-current')) toast('Token moved to pending'); }
+}
+async function markDone(counter){ if (await op('mark-done', { counter })) toast('Counter ' + counter + ' — done'); }
+async function skipCurrent(counter){ if (await op('skip-current', { counter })) toast('Moved to pending'); }
+async function setCounters(n){ if (await op('set-counters', { n })) toast('Counters set to ' + n); }
 async function skipQueued(id){ if (await op('skip-queued', { id })) toast('Skipped to pending'); }
 async function vipAdd(id){
   if ((state.nextVip||1) > 5) { toast('⚠ All 5 VIP slots used today'); return; }
@@ -628,18 +652,10 @@ function render(){
   document.getElementById('mServing').textContent = serving;
   document.getElementById('mDone').textContent = done;
 
-  // current
-  const curNum = document.getElementById('curNum'), curInfo=document.getElementById('curInfo'), curActions=document.getElementById('curActions');
-  if (s.currentToken!=null){
-    const t = s.tokens.find(x=>x.id===s.currentToken);
-    curNum.textContent = String(t.isVip ? t.vipNo : t.no).padStart(2,'0');
-    curInfo.innerHTML = `<h3>${esc(t.name)}</h3><div class="meta">${t.isVip?`<span class="vip-tag">VIP #${t.vipNo} · was #${String(t.no).padStart(2,'0')}</span>`:''}<span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span><span><i class="ti ti-clock"></i> Called ${t.calledAt||''}</span></div>`;
-    curActions.innerHTML = `<button class="btn btn-success" onclick="markDone()"><i class="ti ti-check"></i> Mark Done</button><button class="btn btn-skip" onclick="skipCurrent()"><i class="ti ti-player-skip-forward"></i> Skip</button>`;
-  } else {
-    curNum.textContent='—';
-    curInfo.innerHTML = `<h3>No token being served</h3><div class="meta">Press "Call Next Token" to begin.</div>`;
-    curActions.innerHTML='';
-  }
+  // Per-counter "Now Serving" cards
+  renderCounters(s);
+  const csel = document.getElementById('counterSel');
+  if (csel && document.activeElement !== csel) csel.value = String(s.counters || 1);
 
   // queue (server already orders emergencies first)
   document.getElementById('qCount').textContent = s.queue.length;
@@ -686,13 +702,35 @@ function render(){
     }).join('');
   }
 
-  // Call Next button reflects whether a VIP is up next
-  const cn = document.getElementById('callNextBtn');
-  if (s.vip.length) { const vt = s.tokens.find(x=>x.id===s.vip[0]); cn.innerHTML = `<i class="ti ti-star-filled"></i> Call VIP #${String(vt?vt.vipNo:'').padStart(2,'0')}`; cn.classList.add('vip-mode'); }
-  else { cn.innerHTML = `<i class="ti ti-player-play-filled"></i> Call Next Token`; cn.classList.remove('vip-mode'); }
-
   renderTable();
   renderFeedback();
+}
+
+/* ---- Per-counter Now Serving cards ---- */
+function renderCounters(s){
+  const n = s.counters || 1;
+  const vipNext = s.vip.length ? s.tokens.find(x=>x.id===s.vip[0]) : null;
+  let html = '';
+  for (let c=1; c<=n; c++){
+    const id = s.serving ? s.serving[String(c)] : null;
+    const t = (id!=null) ? s.tokens.find(x=>x.id===id) : null;
+    const num = t ? String(t.isVip ? t.vipNo : t.no).padStart(2,'0') : '00';
+    const info = t
+      ? `<div class="cc-name2">${esc(t.name)}</div><div class="cc-meta">${t.isVip?`<span class="vip-tag">VIP #${t.vipNo} · was #${String(t.no).padStart(2,'0')}</span>`:''}<span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span></div>`
+      : `<div class="cc-idle">Idle — ready to call</div>`;
+    const callBtn = vipNext
+      ? `<button class="btn cc-call vip-mode" onclick="callNext('${c}')"><i class="ti ti-star-filled"></i> Call VIP #${String(vipNext.vipNo).padStart(2,'0')}</button>`
+      : `<button class="btn cc-call" onclick="callNext('${c}')"><i class="ti ti-player-play-filled"></i> Call Next</button>`;
+    const doneSkip = t
+      ? `<button class="btn btn-success" onclick="markDone('${c}')"><i class="ti ti-check"></i> Done</button><button class="btn btn-skip" onclick="skipCurrent('${c}')"><i class="ti ti-player-skip-forward"></i> Skip</button>`
+      : '';
+    html += `<div class="counter-card ${t?'active':''}">
+      <div class="cc-head"><span><i class="ti ti-building-store"></i> Counter ${c}</span><span class="cc-badge ${t?'on':''}">${t?'Serving':'Idle'}</span></div>
+      <div class="cc-main"><div class="cc-num ${t?'has':''}">${num}</div><div class="cc-info">${info}</div></div>
+      <div class="cc-actions">${callBtn}${doneSkip}</div>
+    </div>`;
+  }
+  document.getElementById('countersGrid').innerHTML = html;
 }
 
 /* ---- Table ---- */
@@ -760,6 +798,7 @@ document.getElementById('saveNameBtn').onclick = async () => {
   if (!v) return;
   if (await op('set-name', { name: v })) toast('Organisation name saved');
 };
+document.getElementById('counterSel').onchange = (e) => setCounters(parseInt(e.target.value,10));
 document.getElementById('genQrBtn').onclick = () => {
   const url = document.getElementById('qrUrl').value.trim() || (location.origin + '/form/');
   const box = document.getElementById('qrcode'); box.innerHTML='';

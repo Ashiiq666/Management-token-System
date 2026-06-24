@@ -51,6 +51,17 @@ header {
 /* Main */
 .main { height:calc(100vh - 70px); display:flex; }
 .left { width:60%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:30px; position:relative; }
+/* single counter: one centered block (default look) */
+.left.single .serve-block { display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+/* multiple counters: side-by-side cards */
+.left.multi { flex-direction:row; flex-wrap:wrap; gap:24px; align-items:stretch; justify-content:center; overflow:auto; }
+.left.multi .serve-block { flex:1 1 0; min-width:280px; max-width:48%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:var(--panel); border:1px solid var(--border); border-radius:28px; padding:28px 20px; }
+.left.multi .now-lbl { font-size:18px; letter-spacing:4px; }
+.left.multi .big-token { font-size:clamp(80px,11vw,150px); }
+.left.multi .pname { font-size:28px; }
+.serve-block.pop { animation: slideUp .45s ease; }
+.counter-lbl { margin-top:12px; font-size:26px; font-weight:800; color:var(--brand); display:inline-flex; align-items:center; gap:8px; }
+.left.multi .counter-lbl { font-size:22px; }
 .now-lbl { font-size:24px; font-weight:700; letter-spacing:6px; text-transform:uppercase; color:var(--muted); }
 .big-token { font-size:clamp(140px,20vw,220px); font-weight:900; line-height:.95; letter-spacing:-2px; }
 .big-token.has { background:linear-gradient(135deg,var(--brand),var(--brand2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
@@ -119,15 +130,7 @@ header {
 </header>
 
 <div class="main">
-  <div class="left">
-    <div class="now-lbl">Now Serving</div>
-    <div class="token-stage" id="tokenStage">
-      <div class="big-token empty" id="bigToken">00</div>
-    </div>
-    <div id="patientArea">
-      <div class="waiting-msg" id="waitingMsg">Waiting for next call…</div>
-    </div>
-  </div>
+  <div class="left" id="serveArea"></div>
 
   <div class="right">
     <div class="section-lbl"><i class="ti ti-arrow-up-right"></i> Up Next</div>
@@ -164,9 +167,11 @@ const stateRef = firebase.database().ref('state');
 function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date()); }
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function normalize(s){
-  if(!s || s.date !== localDay()) return { date:localDay(), seq:1, nextNormal:6, tokens:[], queue:[], pending:[], vip:[], currentToken:null, servedCount:0, hospitalName:(s&&s.hospitalName)||CONFIG.hospitalName };
+  if(!s || s.date !== localDay()) return { date:localDay(), seq:1, nextNormal:6, counters:1, tokens:[], queue:[], pending:[], vip:[], serving:{}, servedCount:0, hospitalName:(s&&s.hospitalName)||CONFIG.hospitalName };
   s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending); s.vip=toArr(s.vip);
-  if(s.currentToken===undefined) s.currentToken=null;
+  s.counters = s.counters || 1;
+  if(!s.serving || typeof s.serving!=='object' || Array.isArray(s.serving)) s.serving = {};
+  if(s.currentToken!=null && Object.keys(s.serving).length===0) s.serving['1']=s.currentToken;
   s.hospitalName=s.hospitalName||CONFIG.hospitalName;
   s.tokens.forEach(t=>{ if(t.no==null) t.no=t.id; });
   return s;
@@ -194,32 +199,36 @@ function tick(){
 tick(); setInterval(tick,1000);
 
 /* State comes from the shared server */
-let lastToken = null;
+let lastServing = {};
 function render(s){
   if (!s) return;
-  const big = document.getElementById('bigToken');
-  const stage = document.getElementById('tokenStage');
-  const pArea = document.getElementById('patientArea');
-
-  if (s.currentToken != null){
-    const t = s.tokens.find(x=>x.id===s.currentToken);
+  const n = s.counters || 1;
+  const area = document.getElementById('serveArea');
+  area.className = 'left ' + (n>1 ? 'multi' : 'single');
+  let html = '';
+  for (let c=1; c<=n; c++){
+    const id = s.serving ? s.serving[String(c)] : null;
+    const t = (id!=null) ? s.tokens.find(x=>x.id===id) : null;
+    const changed = lastServing[c] !== id;
     if (t){
-      big.textContent = pad(t.isVip ? t.vipNo : t.no);
-      big.className = 'big-token has';
-      if (s.currentToken !== lastToken){
-        big.classList.remove('anim'); void big.offsetWidth; big.classList.add('anim');
-        stage.classList.remove('flash'); void stage.offsetWidth; stage.classList.add('flash');
-      }
+      const num = pad(t.isVip ? t.vipNo : t.no);
       const dur = (t.registeredTs && t.calledTs) ? `<div class="wait-dur"><i class="ti ti-clock"></i> Waited ${fmtDur(t.calledTs - t.registeredTs)}</div>` : '';
-      pArea.innerHTML = `<div class="pname">${esc(t.name)} ${t.isVip?'<span class="vip-badge"><i class="ti ti-star-filled"></i> VIP</span>':''}</div>
-        <div class="proceed"><span class="dot"></span> Please proceed to counter</div>
-        ${dur}`;
+      html += `<div class="serve-block ${changed?'pop':''}">
+        <div class="now-lbl">Now Serving${n>1?' · Counter '+c:''}</div>
+        <div class="token-stage"><div class="big-token has">${num}</div></div>
+        <div class="pname">${esc(t.name)} ${t.isVip?'<span class="vip-badge"><i class="ti ti-star-filled"></i> VIP</span>':''}</div>
+        ${n>1?`<div class="counter-lbl"><i class="ti ti-building-store"></i> Counter ${c}</div>`:''}
+        <div class="proceed"><span class="dot"></span> Please proceed to ${n>1?('Counter '+c):'counter'}</div>
+        ${dur}</div>`;
+    } else {
+      html += `<div class="serve-block">
+        <div class="now-lbl">Now Serving${n>1?' · Counter '+c:''}</div>
+        <div class="token-stage"><div class="big-token empty">00</div></div>
+        <div class="waiting-msg">Waiting for next call…</div></div>`;
     }
-  } else {
-    big.textContent = '00'; big.className = 'big-token empty';
-    pArea.innerHTML = `<div class="waiting-msg">Waiting for next call…</div>`;
+    lastServing[c] = id;
   }
-  lastToken = s.currentToken;
+  area.innerHTML = html;
 
   // up next (3)
   const list = document.getElementById('upnextList');
