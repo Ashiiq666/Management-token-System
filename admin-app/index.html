@@ -413,12 +413,8 @@ function normalize(s){
   s.tokens.forEach(t=>{ if(t.no==null) t.no=t.id; }); // backfill display number for old data
   return s;
 }
-// Lowest free VIP slot (1–5). Slots free up once that VIP is served, so they recycle.
-function assignVipNo(s){
-  const used = new Set(s.tokens.filter(t=>t.isVip && t.status!=='done').map(t=>t.vipNo));
-  for(let n=1;n<=5;n++){ if(!used.has(n)) return n; }
-  return null;
-}
+// VIP slot counter is forward-only: 1→2→3→4→5, never reused (even after a slot is served).
+function assignVipNo(s){ return (s.nextVip||1) <= 5 ? (s.nextVip||1) : null; }
 function findTok(s, id){ return s.tokens.find(t => t.id === id); }
 const purposeLabel = id => (CONFIG.purposes.find(p => p.id === id) || {label:id}).label;
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -468,7 +464,8 @@ function applyOp(s, op, d){
       if(vno!=null){
         s.queue=s.queue.filter(x=>x!==d.id); s.pending=s.pending.filter(x=>x!==d.id);
         if(!s.vip.includes(d.id)) s.vip.push(d.id);
-        t.isVip=true; t.status='waiting'; t.vipNo=vno; // keep original t.no; add a VIP slot (1–5)
+        t.isVip=true; t.status='waiting'; t.vipNo=vno; // keep original t.no; assign sequential VIP slot
+        s.nextVip = vno + 1; // forward only — never reuse a slot
       }
     }
   } else if(op==='vip-remove'){
@@ -583,8 +580,7 @@ async function markDone(){ if (await op('mark-done')) toast('Marked as done'); }
 async function skipCurrent(){ if (await op('skip-current')) toast('Token moved to pending'); }
 async function skipQueued(id){ if (await op('skip-queued', { id })) toast('Skipped to pending'); }
 async function vipAdd(id){
-  const activeVip = state.tokens.filter(t=>t.isVip && t.status!=='done').length;
-  if (activeVip >= 5) { toast('⚠ VIP full (1–5). Finish a VIP first.'); return; }
+  if ((state.nextVip||1) > 5) { toast('⚠ All 5 VIP slots used today'); return; }
   if (await op('vip-add', { id })) toast('★ Added to VIP queue');
 }
 async function vipRemove(id){ if (await op('vip-remove', { id })) toast('Removed from VIP queue'); }
