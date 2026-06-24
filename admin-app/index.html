@@ -150,6 +150,10 @@ nav { flex: 1; padding: 14px 12px; }
 .q-mid .nm { font-size: 14.5px; font-weight: 700; }
 .q-mid .sub { font-size: 12px; color: var(--text-secondary); display: flex; gap: 8px; align-items: center; margin-top: 2px; flex-wrap: wrap; }
 .q-item .btn { padding: 8px 12px; font-size: 12.5px; }
+.q-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.cc-mini { background: var(--brand); color: #fff; padding: 7px 11px; font-size: 12.5px; min-width: 36px; justify-content: center; }
+[data-theme="dark"] .cc-mini { color: #04141a; }
+.cc-mini-lbl { font-size: 11px; color: var(--text-muted); font-weight: 700; margin-right: 2px; }
 .upnext-tag { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: var(--brand); text-transform: uppercase; }
 .empty { text-align: center; color: var(--text-muted); padding: 30px 10px; font-size: 13.5px; }
 .empty i { font-size: 30px; display: block; margin-bottom: 8px; opacity: .6; }
@@ -476,6 +480,16 @@ function applyOp(s, op, d){
     const curId=s.serving[C]; if(curId!=null){ const t=findTok(s,curId); if(t){ t.status='done'; t.doneAt=localTime(); s.servedCount++; t.isVip=false; } s.serving[C]=null; }
   } else if(op==='skip-current'){
     const curId=s.serving[C]; if(curId!=null){ const t=findTok(s,curId); if(t){ t.status='pending'; t.isVip=false; if(!s.pending.includes(curId)) s.pending.push(curId); } s.serving[C]=null; }
+  } else if(op==='call-token'){
+    // Call a SPECIFIC token to a chosen counter
+    const id=d.id; const t=findTok(s,id);
+    if(t && (t.status==='waiting' || t.status==='pending')){
+      const curId=s.serving[C];
+      if(curId!=null){ const cur=findTok(s,curId); if(cur && cur.status==='serving'){ cur.status='done'; cur.doneAt=localTime(); s.servedCount++; cur.isVip=false; } }
+      s.queue=s.queue.filter(x=>x!==id); s.vip=s.vip.filter(x=>x!==id); s.pending=s.pending.filter(x=>x!==id);
+      t.status='serving'; t.calledAt=localTime(); t.calledTs=Date.now(); t.counter=C;
+      s.serving[C]=id;
+    }
   } else if(op==='set-counters'){
     const n=Math.max(1,Math.min(6, parseInt(d.n,10)||1));
     Object.keys(s.serving||{}).forEach(k=>{ if(parseInt(k,10)>n) delete s.serving[k]; });
@@ -603,6 +617,21 @@ async function markDone(counter){ if (await op('mark-done', { counter })) toast(
 async function skipCurrent(counter){ if (await op('skip-current', { counter })) toast('Moved to pending'); }
 async function setCounters(n){ if (await op('set-counters', { n })) toast('Counters set to ' + n); }
 async function skipQueued(id){ if (await op('skip-queued', { id })) toast('Skipped to pending'); }
+async function callToken(id, counter){
+  const ns = await op('call-token', { id, counter });
+  if (!ns) return;
+  const ct = ns.tokens.find(t=>t.id===id);
+  chime();
+  toast((ct && ct.isVip ? ('★ VIP #' + String(ct.vipNo).padStart(2,'0')) : ('Token ' + String(ct?ct.no:id).padStart(2,'0'))) + ' → Counter ' + counter);
+}
+// Buttons to send THIS token to a specific counter
+function counterCallBtns(id){
+  const n = (state && state.counters) || 1;
+  if (n === 1) return `<button class="btn cc-mini" onclick="callToken(${id},'1')" title="Call to Counter 1"><i class="ti ti-volume"></i> Call</button>`;
+  let b = '<span class="cc-mini-lbl">Call to</span>';
+  for (let c=1;c<=n;c++) b += `<button class="btn cc-mini" onclick="callToken(${id},'${c}')" title="Call to Counter ${c}">C${c}</button>`;
+  return b;
+}
 async function vipAdd(id){
   if ((state.nextVip||1) > 5) { toast('⚠ All 5 VIP slots used today'); return; }
   if (await op('vip-add', { id })) toast('★ Added to VIP queue');
@@ -667,7 +696,7 @@ function render(){
       <div class="q-tok">${String(t.no).padStart(2,'0')}</div>
       <div class="q-mid"><div class="nm">${esc(t.name)} ${i===0?'<span class="upnext-tag">• up next</span>':''}</div>
         <div class="sub"><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span><span>${t.registeredAt}</span></div></div>
-      <button class="btn btn-skip" onclick="skipQueued(${t.id})"><i class="ti ti-player-skip-forward"></i></button>
+      <div class="q-actions">${counterCallBtns(t.id)}<button class="btn btn-skip" onclick="skipQueued(${t.id})" title="Skip"><i class="ti ti-player-skip-forward"></i></button></div>
     </div>`;
   }).join('');
 
@@ -697,7 +726,7 @@ function render(){
         <div class="q-tok">${String(t.vipNo).padStart(2,'0')}</div>
         <div class="q-mid"><div class="nm">${esc(t.name)} <span class="vip-tag">was #${String(t.no).padStart(2,'0')}</span> ${i===0?'<span class="upnext-tag" style="color:#b45309">• next</span>':''}</div>
           <div class="sub"><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span><span>${t.registeredAt}</span></div></div>
-        <button class="btn btn-ghost" onclick="vipRemove(${t.id})"><i class="ti ti-star-off"></i> Remove</button>
+        <div class="q-actions">${counterCallBtns(t.id)}<button class="btn btn-ghost" onclick="vipRemove(${t.id})" title="Remove from VIP"><i class="ti ti-star-off"></i></button></div>
       </div>`;
     }).join('');
   }
