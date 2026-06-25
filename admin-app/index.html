@@ -206,6 +206,10 @@ td .tok { font-weight: 800; color: var(--brand); }
 .purpose-row input { flex:1; height:42px; padding:0 12px; border:1.5px solid var(--border); background:var(--bg-input); color:var(--text-primary); border-radius:var(--radius-md); font-size:14px; font-family:inherit; }
 .purpose-row input:focus { outline:none; border-color:var(--brand); }
 .purpose-row .row-del { width:42px; height:42px; flex-shrink:0; border:1px solid var(--border); background:var(--danger-bg); color:var(--danger); border-radius:var(--radius-md); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.brk-row { border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; margin-bottom:12px; background:var(--bg-input); }
+.brk-row input { height:42px; padding:0 12px; border:1.5px solid var(--border); background:var(--bg-card); color:var(--text-primary); border-radius:var(--radius-md); font-size:14px; font-family:inherit; }
+.brk-row input:focus { outline:none; border-color:var(--brand); }
+.brk-row .btn { padding:9px 14px; font-size:13px; }
 #qrcode { display: flex; justify-content: center; padding: 16px; background: #fff; border-radius: var(--radius-md); margin-top: 12px; width: fit-content; }
 #qrcode canvas, #qrcode img { width: 220px !important; height: 220px !important; }
 #qrActions { display: flex; }
@@ -376,24 +380,9 @@ td .tok { font-weight: 800; color: var(--brand); }
         </div>
       </div>
       <div class="settings-card">
-        <h3>Break Time</h3>
-        <p>Set the daily break window. The display shows it in advance, then switches to a break notice during that time.</p>
-        <div style="display:flex;gap:10px">
-          <div style="flex:1"><label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">From</label>
-            <input type="time" id="breakFrom" style="width:100%;height:46px;padding:0 12px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);border-radius:var(--radius-md);font-size:14px;font-family:inherit"></div>
-          <div style="flex:1"><label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">To</label>
-            <input type="time" id="breakTo" style="width:100%;height:46px;padding:0 12px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);border-radius:var(--radius-md);font-size:14px;font-family:inherit"></div>
-        </div>
-        <input type="text" id="breakMsg" maxlength="60" placeholder="Message (optional) e.g. Lunch break" style="margin-top:10px">
-        <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
-          <button class="btn btn-success" id="saveBreakBtn"><i class="ti ti-check"></i> Save Break Schedule</button>
-          <button class="btn btn-ghost" id="disableBreakBtn">Turn Off</button>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-          <button class="btn btn-skip" id="startBreakBtn"><i class="ti ti-coffee"></i> Start Break Now</button>
-          <button class="btn btn-ghost" id="endBreakBtn">End Now</button>
-        </div>
-        <div id="breakStatus" style="margin-top:12px;font-size:13.5px;font-weight:600"></div>
+        <h3>Break Time (per counter)</h3>
+        <p>Set a daily break window for each counter. The display shows it in advance, then switches that counter to a break notice during the window. Each counter is independent.</p>
+        <div id="breakEditor"></div>
       </div>
       <div class="settings-card">
         <h3>QR Code Generator</h3>
@@ -470,8 +459,8 @@ function normalize(s){
   s.serving = toServingMap(s.serving);
   s.purposes = toArr(s.purposes).filter(p=>p && p.id && p.label);
   if(!s.purposes.length) s.purposes = DEFAULT_PURPOSES.slice();
-  s.brk = (s.brk && typeof s.brk==='object' && !Array.isArray(s.brk)) ? s.brk : {};
-  s.brk.on = !!s.brk.on; s.brk.enabled = !!s.brk.enabled;
+  s.breaks = toServingMap(s.breaks);   // per-counter break map: {counter: {enabled,from,to,msg,on}}
+  Object.keys(s.breaks).forEach(k=>{ const b=s.breaks[k]; if(b&&typeof b==='object'){ b.on=!!b.on; b.enabled=!!b.enabled; } });
   if(s.currentToken!=null && Object.keys(s.serving).length===0) s.serving['1']=s.currentToken; // migrate single→counter 1
   s.seq = s.seq || s.nextId || (s.tokens.length ? Math.max(...s.tokens.map(t=>t.id))+1 : 1);
   s.nextNormal = s.nextNormal || 6;
@@ -584,7 +573,9 @@ function applyOp(s, op, d){
   } else if(op==='set-purposes'){
     if(Array.isArray(d.purposes) && d.purposes.length) s.purposes = d.purposes;
   } else if(op==='set-break'){
-    s.brk = Object.assign({ enabled:false, from:'', to:'', msg:'', on:false }, s.brk||{}, d.brk||{});
+    const C = String(d.counter || 1);
+    s.breaks = s.breaks || {};
+    s.breaks[C] = Object.assign({ enabled:false, from:'', to:'', msg:'', on:false }, s.breaks[C]||{}, d.brk||{});
   } else if(op==='reset'){
     return freshState(s.hospitalName, s.counters);
   }
@@ -662,7 +653,7 @@ document.querySelectorAll('.nav-item').forEach(it => {
     document.getElementById('tab-'+tab).classList.add('active');
     document.getElementById('mobileTitle').textContent = it.textContent.trim();
     document.getElementById('sidebar').classList.remove('open');
-    if (tab==='settings') renderPurposeEditor();
+    if (tab==='settings') { renderPurposeEditor(); renderBreakEditor(); }
   };
 });
 document.getElementById('menuBtn').onclick = () => document.getElementById('sidebar').classList.toggle('open');
@@ -752,17 +743,7 @@ function render(){
   renderCounters(s);
   const csel = document.getElementById('counterSel');
   if (csel && document.activeElement !== csel) csel.value = String(s.counters || 1);
-  const b = s.brk || {};
-  const bf=document.getElementById('breakFrom'), bt=document.getElementById('breakTo'), bm=document.getElementById('breakMsg');
-  if (bf && document.activeElement!==bf) bf.value = b.from || '';
-  if (bt && document.activeElement!==bt) bt.value = b.to || '';
-  if (bm && document.activeElement!==bm) bm.value = b.msg || '';
-  const bs = document.getElementById('breakStatus');
-  if (bs) bs.innerHTML = b.on
-    ? `<span style="color:var(--warning)">● ON BREAK NOW (manual)</span>`
-    : (b.enabled && b.from && b.to
-        ? `<span style="color:var(--success)">● Scheduled break: ${esc(to12h(b.from))} – ${esc(to12h(b.to))}</span>`
-        : `<span style="color:var(--text-muted)">No break set</span>`);
+  if (document.getElementById('tab-settings').classList.contains('active') && !document.querySelector('#breakEditor input:focus')) renderBreakEditor();
 
   // queue (server already orders emergencies first)
   document.getElementById('qCount').textContent = s.queue.length;
@@ -910,17 +891,50 @@ document.getElementById('saveNameBtn').onclick = async () => {
 };
 document.getElementById('counterSel').onchange = (e) => setCounters(parseInt(e.target.value,10));
 
-/* ---- Break time ---- */
+/* ---- Break time (per counter) ---- */
 function to12h(t){ if(!t) return ''; const p=t.split(':'); let h=parseInt(p[0],10); const m=p[1]||'00'; const ap=h>=12?'PM':'AM'; h=h%12||12; return h+':'+m+' '+ap; }
-document.getElementById('saveBreakBtn').onclick = async () => {
-  const from = document.getElementById('breakFrom').value, to = document.getElementById('breakTo').value;
-  if (!from || !to) { toast('Set both From and To times'); return; }
-  const msg = document.getElementById('breakMsg').value.trim();
-  if (await op('set-break', { brk:{ enabled:true, from, to, msg, on:false } })) toast('Break schedule saved');
-};
-document.getElementById('disableBreakBtn').onclick = async () => { if (await op('set-break', { brk:{ enabled:false, on:false } })) toast('Break schedule off'); };
-document.getElementById('startBreakBtn').onclick = async () => { if (await op('set-break', { brk:{ on:true } })) toast('Break started'); };
-document.getElementById('endBreakBtn').onclick = async () => { if (await op('set-break', { brk:{ on:false } })) toast('Break ended'); };
+function breakStatusText(b){
+  if(!b) return '<span style="color:var(--text-muted)">No break set</span>';
+  if(b.on) return '<span style="color:var(--warning)">● ON BREAK NOW (manual)</span>';
+  if(b.enabled && b.from && b.to) return `<span style="color:var(--success)">● Scheduled: ${esc(to12h(b.from))} – ${esc(to12h(b.to))}</span>`;
+  return '<span style="color:var(--text-muted)">No break set</span>';
+}
+function renderBreakEditor(){
+  const box = document.getElementById('breakEditor'); if(!box || !state) return;
+  const n = state.counters || 1;
+  const breaks = state.breaks || {};
+  let html = '';
+  for(let c=1;c<=n;c++){
+    const b = breaks[String(c)] || {};
+    html += `<div class="brk-row" data-c="${c}">
+      <div style="font-weight:800;margin-bottom:8px"><i class="ti ti-building-store"></i> Counter ${c}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">From</label><input type="time" class="bk-from" value="${b.from||''}"></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">To</label><input type="time" class="bk-to" value="${b.to||''}"></div>
+        <input type="text" class="bk-msg" maxlength="60" placeholder="Message (optional)" value="${esc(b.msg||'')}" style="flex:1;min-width:140px">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn btn-success bk-save"><i class="ti ti-check"></i> Save</button>
+        <button class="btn btn-ghost bk-off">Turn Off</button>
+        <button class="btn btn-skip bk-start"><i class="ti ti-coffee"></i> Break Now</button>
+        <button class="btn btn-ghost bk-end">End Now</button>
+      </div>
+      <div class="bk-status" style="margin-top:8px;font-size:13px;font-weight:600">${breakStatusText(b)}</div>
+    </div>`;
+  }
+  box.innerHTML = html;
+  box.querySelectorAll('.brk-row').forEach(row => {
+    const c = parseInt(row.dataset.c,10);
+    row.querySelector('.bk-save').onclick = async () => {
+      const from=row.querySelector('.bk-from').value, to=row.querySelector('.bk-to').value;
+      if(!from||!to){ toast('Set both From and To'); return; }
+      if(await op('set-break',{counter:c, brk:{enabled:true, from, to, msg:row.querySelector('.bk-msg').value.trim(), on:false}})) toast('Counter '+c+' break saved');
+    };
+    row.querySelector('.bk-off').onclick   = async () => { if(await op('set-break',{counter:c, brk:{enabled:false, on:false}})) toast('Counter '+c+' break off'); };
+    row.querySelector('.bk-start').onclick = async () => { if(await op('set-break',{counter:c, brk:{on:true}})) toast('Counter '+c+' on break'); };
+    row.querySelector('.bk-end').onclick   = async () => { if(await op('set-break',{counter:c, brk:{on:false}})) toast('Counter '+c+' break ended'); };
+  });
+}
 
 /* ---- Issue types (form dropdown) editor ---- */
 function purposeRow(label){

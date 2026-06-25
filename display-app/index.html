@@ -73,6 +73,13 @@ header {
 .left.multi .big-token { font-size:clamp(80px,11vw,150px); }
 .left.multi .pname { font-size:28px; }
 .serve-block.pop { animation: slideUp .45s ease; }
+.serve-block.brk { background:#fffbeb; border-color:#fde68a; }
+[data-theme="dark"] .serve-block.brk { background:#2a1a05; border-color:#713f12; }
+.bk-c-icon { width:96px; height:96px; border-radius:50%; background:linear-gradient(135deg,#f59e0b,#f97316); color:#fff; display:flex; align-items:center; justify-content:center; font-size:48px; margin-bottom:14px; }
+.bk-c-title { font-size:clamp(48px,7vw,84px); font-weight:900; color:#b45309; line-height:1; }
+.bk-c-msg { font-size:22px; color:var(--muted); font-weight:600; margin-top:12px; }
+.bk-c-until { font-size:26px; font-weight:800; color:#b45309; margin-top:14px; }
+.bk-soon { margin-top:18px; font-size:16px; font-weight:700; color:#b45309; background:#fffbeb; border:1px solid #fde68a; padding:6px 14px; border-radius:999px; display:inline-flex; align-items:center; gap:6px; }
 .counter-lbl { margin-top:12px; font-size:26px; font-weight:800; color:var(--brand); display:inline-flex; align-items:center; gap:8px; }
 .left.multi .counter-lbl { font-size:22px; }
 .now-lbl { font-size:24px; font-weight:700; letter-spacing:6px; text-transform:uppercase; color:var(--muted); }
@@ -197,8 +204,8 @@ function normalize(s){
   s.serving = toServingMap(s.serving);
   if(s.currentToken!=null && Object.keys(s.serving).length===0) s.serving['1']=s.currentToken;
   s.hospitalName=s.hospitalName||CONFIG.hospitalName;
-  s.brk = (s.brk && typeof s.brk==='object' && !Array.isArray(s.brk)) ? s.brk : {};
-  s.brk.on = !!s.brk.on;
+  s.breaks = toServingMap(s.breaks);   // per-counter break map
+  Object.keys(s.breaks).forEach(k=>{ const b=s.breaks[k]; if(b&&typeof b==='object'){ b.on=!!b.on; b.enabled=!!b.enabled; } });
   s.tokens.forEach(t=>{ if(t.no==null) t.no=t.id; });
   const onCounter = new Set(Object.values(s.serving||{}).filter(v=>v!=null));
   s.tokens.forEach(t=>{ if(t.status==='serving' && !onCounter.has(t.id)){ t.status='waiting'; if(!s.queue.includes(t.id) && !(s.vip||[]).includes(t.id)){ if(t.isVip) s.vip.push(t.id); else s.queue.unshift(t.id); } } });
@@ -237,55 +244,66 @@ function inWindow(b, now){
   const f=fh*60+fm, t=th*60+tm;
   return f<=t ? (cur>=f && cur<t) : (cur>=f || cur<t);
 }
-function updateBreak(){
-  const b = (curState && curState.brk) || {};
-  const now = new Date();
-  const onNow = !!b.on || inWindow(b, now);
-  document.getElementById('breakScreen').classList.toggle('show', onNow);
-  if(onNow){
-    document.getElementById('bkMsg').textContent = b.msg || 'Service will resume shortly';
-    document.getElementById('bkUntil').textContent = b.to ? ('Back at ' + to12h(b.to)) : '';
-  }
-  // advance notice when a break is scheduled but not happening yet
-  const notice = document.getElementById('breakNotice');
-  if(b.enabled && b.from && b.to && !onNow){
-    notice.style.display = 'flex';
-    notice.innerHTML = `<i class="ti ti-coffee"></i> Break time: ${to12h(b.from)} – ${to12h(b.to)}`;
-  } else { notice.style.display = 'none'; }
+function breakOn(b, now){ return !!(b && (b.on || inWindow(b, now))); }
+function breakSig(s){
+  const now=new Date(); const n=s.counters||1; let sig='';
+  for(let c=1;c<=n;c++){ sig += breakOn((s.breaks||{})[String(c)]||{}, now) ? '1':'0'; }
+  return sig;
 }
+function updateBreak(){ if(curState){ const sig=breakSig(curState); if(sig!==lastBreakSig) renderServe(curState); } }
 
 /* State comes from the shared server */
 let lastServing = {};
-function render(s){
-  if (!s) return;
-  curState = s;
-  updateBreak();
+let lastBreakSig = '';
+function renderServe(s){
   const n = s.counters || 1;
+  const now = new Date();
   const area = document.getElementById('serveArea');
   area.className = 'left ' + (n>1 ? 'multi' : 'single');
   let html = '';
   for (let c=1; c<=n; c++){
+    const b = (s.breaks||{})[String(c)] || {};
+    if (breakOn(b, now)){
+      html += `<div class="serve-block brk">
+        <div class="bk-c-icon"><i class="ti ti-coffee"></i></div>
+        <div class="now-lbl">${n>1?('Counter '+c):''}</div>
+        <div class="bk-c-title">On Break</div>
+        <div class="bk-c-msg">${esc(b.msg||'Service will resume shortly')}</div>
+        ${b.to?`<div class="bk-c-until">Back at ${to12h(b.to)}</div>`:''}
+      </div>`;
+      lastServing[c] = '_brk';
+      continue;
+    }
+    const note = (b.enabled && b.from && b.to) ? `<div class="bk-soon"><i class="ti ti-coffee"></i> Break ${to12h(b.from)} – ${to12h(b.to)}</div>` : '';
     const id = s.serving ? s.serving[String(c)] : null;
     const t = (id!=null) ? s.tokens.find(x=>x.id===id) : null;
     const changed = lastServing[c] !== id;
     if (t){
-      const num = pad(t.isVip ? t.vipNo : t.no);
       html += `<div class="serve-block ${changed?'pop':''}">
         <div class="now-lbl">Now Serving${n>1?' · Counter '+c:''}</div>
-        <div class="token-stage"><div class="big-token has">${num}</div></div>
+        <div class="token-stage"><div class="big-token has">${pad(t.isVip ? t.vipNo : t.no)}</div></div>
         <div class="pname">${esc(t.name)}</div>
         ${n>1?`<div class="counter-lbl"><i class="ti ti-building-store"></i> Counter ${c}</div>`:''}
         <div class="proceed"><span class="dot"></span> Proceed to ${n>1?('Counter '+c):'counter'}</div>
+        ${note}
       </div>`;
     } else {
       html += `<div class="serve-block">
         <div class="now-lbl">Now Serving${n>1?' · Counter '+c:''}</div>
         <div class="token-stage"><div class="big-token empty">00</div></div>
-        <div class="waiting-msg">Waiting for next call…</div></div>`;
+        <div class="waiting-msg">Waiting for next call…</div>
+        ${note}
+      </div>`;
     }
     lastServing[c] = id;
   }
   area.innerHTML = html;
+  lastBreakSig = breakSig(s);
+}
+function render(s){
+  if (!s) return;
+  curState = s;
+  renderServe(s);
 
   // up next (3)
   const list = document.getElementById('upnextList');
