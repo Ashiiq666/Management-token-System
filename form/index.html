@@ -251,6 +251,7 @@ input.inp::placeholder, textarea.inp::placeholder { color: var(--text-muted); }
 .badge-pill {
   display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px;
   border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: var(--brand-light); color: var(--brand);
 }
 .badge-pill.it { background: var(--brand-light); color: var(--brand); }
 .badge-pill.outlook { background: var(--success-bg); color: var(--success); }
@@ -448,14 +449,21 @@ function registerComplaint(payload) {
   });
 }
 
-/* ---------- Build issue-type dropdown ---------- */
+/* ---------- Build issue-type dropdown (from DB, admin-editable) ---------- */
 let selectedPurpose = null;
+let PURPOSES = CONFIG.purposes.slice();   // default until DB loads
 const purposeSelect = document.getElementById('f_purpose');
-CONFIG.purposes.forEach(p => {
-  const o = document.createElement('option');
-  o.value = p.id; o.textContent = p.label;
-  purposeSelect.appendChild(o);
-});
+function renderPurposeOptions(){
+  const keep = purposeSelect.value;
+  purposeSelect.innerHTML = '<option value="" disabled selected>Select an issue type…</option>';
+  PURPOSES.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.id; o.textContent = p.label;
+    purposeSelect.appendChild(o);
+  });
+  if (keep && PURPOSES.some(p=>p.id===keep)) purposeSelect.value = keep;
+}
+renderPurposeOptions();
 purposeSelect.addEventListener('change', () => {
   selectedPurpose = purposeSelect.value || null;
   document.getElementById('err_purpose').classList.remove('show');
@@ -534,7 +542,8 @@ function showConfirm(token, ahead) {
     td.textContent = String(cur).padStart(2,'0');
   }, 35);
 
-  const pLabel = CONFIG.purposes.find(p => p.id === token.purpose).label;
+  const pMatch = PURPOSES.find(p => p.id === token.purpose) || CONFIG.purposes.find(p => p.id === token.purpose);
+  const pLabel = pMatch ? pMatch.label : token.purpose;
   document.getElementById('summaryBox').innerHTML = `
     <div class="row"><span>Name</span><span>${esc(token.name)}</span></div>
     <div class="row"><span>Phone</span><span>${token.phone}</span></div>
@@ -567,10 +576,14 @@ document.getElementById('againLink').onclick = () => {
   window.scrollTo(0,0);
 };
 
-// Keep the organisation name in sync with whatever admin set
+// Keep the organisation name + issue-type list in sync with whatever admin set
 stateRef.on('value', snap => {
   const s = snap.val();
-  if (s && s.hospitalName) document.getElementById('hospName').textContent = s.hospitalName;
+  if (!s) return;
+  if (s.hospitalName) document.getElementById('hospName').textContent = s.hospitalName;
+  let list = s.purposes;
+  if (list && typeof list === 'object' && !Array.isArray(list)) list = Object.keys(list).sort((a,b)=>a-b).map(k=>list[k]);
+  if (Array.isArray(list) && list.length) { PURPOSES = list.filter(p=>p && p.id && p.label); renderPurposeOptions(); }
 });
 </script>
 </body>

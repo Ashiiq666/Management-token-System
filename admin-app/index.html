@@ -159,7 +159,7 @@ nav { flex: 1; padding: 14px 12px; }
 .empty i { font-size: 30px; display: block; margin-bottom: 8px; opacity: .6; }
 
 /* badges */
-.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: var(--brand-light); color: var(--brand); }
 .badge.it { background: var(--brand-light); color: var(--brand); }
 .badge.outlook { background: var(--success-bg); color: var(--success); }
 .badge.hardware { background: var(--warning-bg); color: var(--warning); }
@@ -202,6 +202,10 @@ td .tok { font-weight: 800; color: var(--brand); }
 .settings-card p { font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; }
 .settings-card input[type=text] { width: 100%; height: 46px; padding: 0 14px; border: 1.5px solid var(--border); background: var(--bg-input); color: var(--text-primary); border-radius: var(--radius-md); font-size: 14px; font-family: inherit; margin-bottom: 12px; }
 .settings-card input:focus { outline: none; border-color: var(--brand); }
+.purpose-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.purpose-row input { flex:1; height:42px; padding:0 12px; border:1.5px solid var(--border); background:var(--bg-input); color:var(--text-primary); border-radius:var(--radius-md); font-size:14px; font-family:inherit; }
+.purpose-row input:focus { outline:none; border-color:var(--brand); }
+.purpose-row .row-del { width:42px; height:42px; flex-shrink:0; border:1px solid var(--border); background:var(--danger-bg); color:var(--danger); border-radius:var(--radius-md); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
 #qrcode { display: flex; justify-content: center; padding: 16px; background: #fff; border-radius: var(--radius-md); margin-top: 12px; width: fit-content; }
 #qrcode canvas, #qrcode img { width: 220px !important; height: 220px !important; }
 #qrActions { display: flex; }
@@ -363,6 +367,15 @@ td .tok { font-weight: 800; color: var(--brand); }
         </select>
       </div>
       <div class="settings-card">
+        <h3>Issue Types (Form Dropdown)</h3>
+        <p>Edit the list shown on the complaint form. Saving applies it everywhere instantly.</p>
+        <div id="purposeEditor"></div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button class="btn btn-ghost" id="addPurposeBtn"><i class="ti ti-plus"></i> Add Type</button>
+          <button class="btn btn-success" id="savePurposesBtn"><i class="ti ti-check"></i> Save Issue Types</button>
+        </div>
+      </div>
+      <div class="settings-card">
         <h3>QR Code Generator</h3>
         <p>Enter the complaint form URL. Users scan this to register a complaint.</p>
         <input type="text" id="qrUrl" placeholder="https://your-complaint-form.vercel.app">
@@ -409,6 +422,8 @@ const CONFIG = {
   adminPassword: "Amal123"
 };
 
+const DEFAULT_PURPOSES = CONFIG.purposes.slice();   // fallback issue-type list
+
 /* ---- Firebase: shared, always-free, real-time database ---- */
 const FIREBASE_DB_URL = "https://flydubai-17161-default-rtdb.asia-southeast1.firebasedatabase.app";
 firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
@@ -433,6 +448,8 @@ function normalize(s){
   s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending); s.vip=toArr(s.vip);
   s.counters = s.counters || 1;
   s.serving = toServingMap(s.serving);
+  s.purposes = toArr(s.purposes).filter(p=>p && p.id && p.label);
+  if(!s.purposes.length) s.purposes = DEFAULT_PURPOSES.slice();
   if(s.currentToken!=null && Object.keys(s.serving).length===0) s.serving['1']=s.currentToken; // migrate single→counter 1
   s.seq = s.seq || s.nextId || (s.tokens.length ? Math.max(...s.tokens.map(t=>t.id))+1 : 1);
   s.nextNormal = s.nextNormal || 6;
@@ -542,6 +559,8 @@ function applyOp(s, op, d){
     const t=findTok(s,d.id); if(t) t.reviewed=true;
   } else if(op==='set-name'){
     if(d.name) s.hospitalName=d.name;
+  } else if(op==='set-purposes'){
+    if(Array.isArray(d.purposes) && d.purposes.length) s.purposes = d.purposes;
   } else if(op==='reset'){
     return freshState(s.hospitalName, s.counters);
   }
@@ -619,6 +638,7 @@ document.querySelectorAll('.nav-item').forEach(it => {
     document.getElementById('tab-'+tab).classList.add('active');
     document.getElementById('mobileTitle').textContent = it.textContent.trim();
     document.getElementById('sidebar').classList.remove('open');
+    if (tab==='settings') renderPurposeEditor();
   };
 });
 document.getElementById('menuBtn').onclick = () => document.getElementById('sidebar').classList.toggle('open');
@@ -694,6 +714,8 @@ function flashCurrent(){ const el=document.getElementById('curNum'); el.classLis
 function render(){
   const s = state;
   if (!s) return;
+  CONFIG.purposes = s.purposes && s.purposes.length ? s.purposes : DEFAULT_PURPOSES; // live issue-type list
+  buildPurposeFilter();
   const waiting = s.tokens.filter(t=>t.status==='waiting').length;
   const serving = Object.values(s.serving||{}).filter(v=>v!=null).length;
   const done = s.tokens.filter(t=>t.status==='done').length;
@@ -786,7 +808,10 @@ function renderCounters(s){
 /* ---- Table ---- */
 function buildPurposeFilter(){
   const sel = document.getElementById('filterPurpose');
+  const keep = sel.value;
+  sel.innerHTML = '<option value="">All purposes</option>';
   CONFIG.purposes.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.label; sel.appendChild(o); });
+  if (keep) sel.value = keep;
 }
 function renderTable(){
   const s = state;
@@ -849,6 +874,37 @@ document.getElementById('saveNameBtn').onclick = async () => {
   if (await op('set-name', { name: v })) toast('Organisation name saved');
 };
 document.getElementById('counterSel').onchange = (e) => setCounters(parseInt(e.target.value,10));
+
+/* ---- Issue types (form dropdown) editor ---- */
+function purposeRow(label){
+  const div = document.createElement('div');
+  div.className = 'purpose-row';
+  const inp = document.createElement('input');
+  inp.type='text'; inp.maxLength=30; inp.value = label||''; inp.placeholder='e.g. Network Issue';
+  const del = document.createElement('button');
+  del.className='row-del'; del.type='button'; del.innerHTML='<i class="ti ti-x"></i>';
+  del.onclick = () => div.remove();
+  div.appendChild(inp); div.appendChild(del);
+  return div;
+}
+function renderPurposeEditor(){
+  const box = document.getElementById('purposeEditor');
+  box.innerHTML = '';
+  (CONFIG.purposes || DEFAULT_PURPOSES).forEach(p => box.appendChild(purposeRow(p.label)));
+}
+function slugify(s){ return String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+document.getElementById('addPurposeBtn').onclick = () => document.getElementById('purposeEditor').appendChild(purposeRow(''));
+document.getElementById('savePurposesBtn').onclick = async () => {
+  const labels = [...document.querySelectorAll('#purposeEditor input')].map(i=>i.value.trim()).filter(Boolean);
+  if (!labels.length) { toast('Add at least one issue type'); return; }
+  const seen = {}; const purposes = labels.map(label => {
+    let id = slugify(label) || 'type';
+    while (seen[id]) id = id + '-1';
+    seen[id] = true;
+    return { id, label };
+  });
+  if (await op('set-purposes', { purposes })) toast('Issue types saved');
+};
 document.getElementById('genQrBtn').onclick = () => {
   const url = document.getElementById('qrUrl').value.trim() || (location.origin + '/form/');
   const box = document.getElementById('qrcode'); box.innerHTML='';
