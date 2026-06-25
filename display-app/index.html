@@ -48,6 +48,10 @@ header {
 .h-right .clock { font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; }
 .h-right .date { font-size:13px; color:var(--muted); font-weight:600; letter-spacing:1px; }
 
+/* Break advance-notice bar */
+.break-notice { align-items:center; justify-content:center; gap:10px; background:#fffbeb; color:#b45309; border-bottom:1px solid #fde68a; font-size:18px; font-weight:800; letter-spacing:1px; padding:8px 16px; }
+.break-notice i { font-size:20px; }
+
 /* Break overlay */
 .break-screen { position:fixed; inset:70px 0 0 0; background:var(--bg); z-index:60; display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:30px; }
 .break-screen.show { display:flex; }
@@ -136,6 +140,8 @@ header {
   <div class="h-right"><div class="clock" id="clock">--:--:--</div><div class="date" id="date">—</div></div>
 </header>
 
+<div class="break-notice" id="breakNotice" style="display:none"></div>
+
 <div class="main">
   <div class="left" id="serveArea"></div>
 
@@ -179,6 +185,7 @@ const CONFIG = {
 const FIREBASE_DB_URL = "https://flydubai-17161-default-rtdb.asia-southeast1.firebasedatabase.app";
 firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
 const stateRef = firebase.database().ref('state');
+let curState = null;   // declared early: tick() calls updateBreak() on load
 // Region-based: uses whatever timezone the device is set to
 function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date()); }
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
@@ -217,22 +224,42 @@ function tick(){
   document.getElementById('clock').textContent = d.toLocaleTimeString('en-US',{hour12:false});
   document.getElementById('date').textContent = d.toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).toUpperCase();
   const bc = document.getElementById('bkClock'); if (bc) bc.textContent = d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true});
+  updateBreak(); // re-evaluate scheduled break window each tick
 }
 tick(); setInterval(tick,1000);
+
+/* ---- Break time (scheduled window + manual) ---- */
+function to12h(t){ if(!t) return ''; const p=String(t).split(':'); let h=parseInt(p[0],10); const m=p[1]||'00'; const ap=h>=12?'PM':'AM'; h=h%12||12; return h+':'+m+' '+ap; }
+function inWindow(b, now){
+  if(!b.enabled || !b.from || !b.to) return false;
+  const cur = now.getHours()*60 + now.getMinutes();
+  const [fh,fm]=b.from.split(':').map(Number), [th,tm]=b.to.split(':').map(Number);
+  const f=fh*60+fm, t=th*60+tm;
+  return f<=t ? (cur>=f && cur<t) : (cur>=f || cur<t);
+}
+function updateBreak(){
+  const b = (curState && curState.brk) || {};
+  const now = new Date();
+  const onNow = !!b.on || inWindow(b, now);
+  document.getElementById('breakScreen').classList.toggle('show', onNow);
+  if(onNow){
+    document.getElementById('bkMsg').textContent = b.msg || 'Service will resume shortly';
+    document.getElementById('bkUntil').textContent = b.to ? ('Back at ' + to12h(b.to)) : '';
+  }
+  // advance notice when a break is scheduled but not happening yet
+  const notice = document.getElementById('breakNotice');
+  if(b.enabled && b.from && b.to && !onNow){
+    notice.style.display = 'flex';
+    notice.innerHTML = `<i class="ti ti-coffee"></i> Break time: ${to12h(b.from)} – ${to12h(b.to)}`;
+  } else { notice.style.display = 'none'; }
+}
 
 /* State comes from the shared server */
 let lastServing = {};
 function render(s){
   if (!s) return;
-  // Break overlay
-  const bk = document.getElementById('breakScreen');
-  if (s.brk && s.brk.on){
-    bk.classList.add('show');
-    document.getElementById('bkMsg').textContent = s.brk.msg || 'Service will resume shortly';
-    document.getElementById('bkUntil').textContent = s.brk.until ? ('Back at ' + s.brk.until) : '';
-  } else {
-    bk.classList.remove('show');
-  }
+  curState = s;
+  updateBreak();
   const n = s.counters || 1;
   const area = document.getElementById('serveArea');
   area.className = 'left ' + (n>1 ? 'multi' : 'single');

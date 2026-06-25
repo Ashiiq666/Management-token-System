@@ -377,13 +377,21 @@ td .tok { font-weight: 800; color: var(--brand); }
       </div>
       <div class="settings-card">
         <h3>Break Time</h3>
-        <p>Pause service and show a break notice on the display screen.</p>
-        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Back at (optional)</label>
-        <input type="time" id="breakUntil" style="width:100%;height:46px;padding:0 14px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);border-radius:var(--radius-md);font-size:14px;font-family:inherit;margin-bottom:10px">
-        <input type="text" id="breakMsg" maxlength="60" placeholder="Message (optional) e.g. Lunch break">
-        <div style="display:flex;gap:8px;margin-top:4px">
-          <button class="btn btn-success" id="startBreakBtn"><i class="ti ti-coffee"></i> Start Break</button>
-          <button class="btn btn-ghost" id="endBreakBtn"><i class="ti ti-player-play"></i> End Break</button>
+        <p>Set the daily break window. The display shows it in advance, then switches to a break notice during that time.</p>
+        <div style="display:flex;gap:10px">
+          <div style="flex:1"><label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">From</label>
+            <input type="time" id="breakFrom" style="width:100%;height:46px;padding:0 12px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);border-radius:var(--radius-md);font-size:14px;font-family:inherit"></div>
+          <div style="flex:1"><label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">To</label>
+            <input type="time" id="breakTo" style="width:100%;height:46px;padding:0 12px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);border-radius:var(--radius-md);font-size:14px;font-family:inherit"></div>
+        </div>
+        <input type="text" id="breakMsg" maxlength="60" placeholder="Message (optional) e.g. Lunch break" style="margin-top:10px">
+        <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+          <button class="btn btn-success" id="saveBreakBtn"><i class="ti ti-check"></i> Save Break Schedule</button>
+          <button class="btn btn-ghost" id="disableBreakBtn">Turn Off</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn btn-skip" id="startBreakBtn"><i class="ti ti-coffee"></i> Start Break Now</button>
+          <button class="btn btn-ghost" id="endBreakBtn">End Now</button>
         </div>
         <div id="breakStatus" style="margin-top:12px;font-size:13.5px;font-weight:600"></div>
       </div>
@@ -463,7 +471,7 @@ function normalize(s){
   s.purposes = toArr(s.purposes).filter(p=>p && p.id && p.label);
   if(!s.purposes.length) s.purposes = DEFAULT_PURPOSES.slice();
   s.brk = (s.brk && typeof s.brk==='object' && !Array.isArray(s.brk)) ? s.brk : {};
-  s.brk.on = !!s.brk.on;
+  s.brk.on = !!s.brk.on; s.brk.enabled = !!s.brk.enabled;
   if(s.currentToken!=null && Object.keys(s.serving).length===0) s.serving['1']=s.currentToken; // migrate single→counter 1
   s.seq = s.seq || s.nextId || (s.tokens.length ? Math.max(...s.tokens.map(t=>t.id))+1 : 1);
   s.nextNormal = s.nextNormal || 6;
@@ -576,7 +584,7 @@ function applyOp(s, op, d){
   } else if(op==='set-purposes'){
     if(Array.isArray(d.purposes) && d.purposes.length) s.purposes = d.purposes;
   } else if(op==='set-break'){
-    s.brk = { on: !!d.on, until: d.until||'', msg: d.msg||'' };
+    s.brk = Object.assign({ enabled:false, from:'', to:'', msg:'', on:false }, s.brk||{}, d.brk||{});
   } else if(op==='reset'){
     return freshState(s.hospitalName, s.counters);
   }
@@ -744,10 +752,17 @@ function render(){
   renderCounters(s);
   const csel = document.getElementById('counterSel');
   if (csel && document.activeElement !== csel) csel.value = String(s.counters || 1);
+  const b = s.brk || {};
+  const bf=document.getElementById('breakFrom'), bt=document.getElementById('breakTo'), bm=document.getElementById('breakMsg');
+  if (bf && document.activeElement!==bf) bf.value = b.from || '';
+  if (bt && document.activeElement!==bt) bt.value = b.to || '';
+  if (bm && document.activeElement!==bm) bm.value = b.msg || '';
   const bs = document.getElementById('breakStatus');
-  if (bs) bs.innerHTML = (s.brk && s.brk.on)
-    ? `<span style="color:var(--warning)">● ON BREAK${s.brk.until?(' · back at '+esc(s.brk.until)):''}</span>`
-    : `<span style="color:var(--text-muted)">Not on break</span>`;
+  if (bs) bs.innerHTML = b.on
+    ? `<span style="color:var(--warning)">● ON BREAK NOW (manual)</span>`
+    : (b.enabled && b.from && b.to
+        ? `<span style="color:var(--success)">● Scheduled break: ${esc(to12h(b.from))} – ${esc(to12h(b.to))}</span>`
+        : `<span style="color:var(--text-muted)">No break set</span>`);
 
   // queue (server already orders emergencies first)
   document.getElementById('qCount').textContent = s.queue.length;
@@ -897,12 +912,15 @@ document.getElementById('counterSel').onchange = (e) => setCounters(parseInt(e.t
 
 /* ---- Break time ---- */
 function to12h(t){ if(!t) return ''; const p=t.split(':'); let h=parseInt(p[0],10); const m=p[1]||'00'; const ap=h>=12?'PM':'AM'; h=h%12||12; return h+':'+m+' '+ap; }
-document.getElementById('startBreakBtn').onclick = async () => {
-  const until = to12h(document.getElementById('breakUntil').value);
+document.getElementById('saveBreakBtn').onclick = async () => {
+  const from = document.getElementById('breakFrom').value, to = document.getElementById('breakTo').value;
+  if (!from || !to) { toast('Set both From and To times'); return; }
   const msg = document.getElementById('breakMsg').value.trim();
-  if (await op('set-break', { on:true, until, msg })) toast('Break started');
+  if (await op('set-break', { brk:{ enabled:true, from, to, msg, on:false } })) toast('Break schedule saved');
 };
-document.getElementById('endBreakBtn').onclick = async () => { if (await op('set-break', { on:false })) toast('Break ended'); };
+document.getElementById('disableBreakBtn').onclick = async () => { if (await op('set-break', { brk:{ enabled:false, on:false } })) toast('Break schedule off'); };
+document.getElementById('startBreakBtn').onclick = async () => { if (await op('set-break', { brk:{ on:true } })) toast('Break started'); };
+document.getElementById('endBreakBtn').onclick = async () => { if (await op('set-break', { brk:{ on:false } })) toast('Break ended'); };
 
 /* ---- Issue types (form dropdown) editor ---- */
 function purposeRow(label){
