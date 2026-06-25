@@ -268,7 +268,7 @@ function renderServe(s){
         <div class="bk-c-icon"><i class="ti ti-coffee"></i></div>
         <div class="now-lbl">${n>1?('Counter '+c):''}</div>
         <div class="bk-c-title">On Break</div>
-        <div class="bk-c-msg">${esc(b.msg||'Service will resume shortly')}</div>
+        <div class="bk-c-msg">Service will resume shortly</div>
         ${b.to?`<div class="bk-c-until">Back at ${to12h(b.to)}</div>`:''}
       </div>`;
       lastServing[c] = '_brk';

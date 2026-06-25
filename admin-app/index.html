@@ -911,7 +911,6 @@ function renderBreakEditor(){
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
         <div><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">From</label><input type="time" class="bk-from" value="${b.from||''}"></div>
         <div><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">To</label><input type="time" class="bk-to" value="${b.to||''}"></div>
-        <input type="text" class="bk-msg" maxlength="60" placeholder="Message (optional)" value="${esc(b.msg||'')}" style="flex:1;min-width:140px">
       </div>
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
         <button class="btn btn-success bk-save"><i class="ti ti-check"></i> Save</button>
@@ -928,7 +927,7 @@ function renderBreakEditor(){
     row.querySelector('.bk-save').onclick = async () => {
       const from=row.querySelector('.bk-from').value, to=row.querySelector('.bk-to').value;
       if(!from||!to){ toast('Set both From and To'); return; }
-      if(await op('set-break',{counter:c, brk:{enabled:true, from, to, msg:row.querySelector('.bk-msg').value.trim(), on:false}})) toast('Counter '+c+' break saved');
+      if(await op('set-break',{counter:c, brk:{enabled:true, from, to, on:false}})) toast('Counter '+c+' break saved');
     };
     row.querySelector('.bk-off').onclick   = async () => { if(await op('set-break',{counter:c, brk:{enabled:false, on:false}})) toast('Counter '+c+' break off'); };
     row.querySelector('.bk-start').onclick = async () => { if(await op('set-break',{counter:c, brk:{on:true}})) toast('Counter '+c+' on break'); };
