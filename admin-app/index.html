@@ -376,6 +376,18 @@ td .tok { font-weight: 800; color: var(--brand); }
         </div>
       </div>
       <div class="settings-card">
+        <h3>Break Time</h3>
+        <p>Pause service and show a break notice on the display screen.</p>
+        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Back at (optional)</label>
+        <input type="time" id="breakUntil" style="width:100%;height:46px;padding:0 14px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);border-radius:var(--radius-md);font-size:14px;font-family:inherit;margin-bottom:10px">
+        <input type="text" id="breakMsg" maxlength="60" placeholder="Message (optional) e.g. Lunch break">
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button class="btn btn-success" id="startBreakBtn"><i class="ti ti-coffee"></i> Start Break</button>
+          <button class="btn btn-ghost" id="endBreakBtn"><i class="ti ti-player-play"></i> End Break</button>
+        </div>
+        <div id="breakStatus" style="margin-top:12px;font-size:13.5px;font-weight:600"></div>
+      </div>
+      <div class="settings-card">
         <h3>QR Code Generator</h3>
         <p>Enter the complaint form URL. Users scan this to register a complaint.</p>
         <input type="text" id="qrUrl" placeholder="https://your-complaint-form.vercel.app">
@@ -450,6 +462,8 @@ function normalize(s){
   s.serving = toServingMap(s.serving);
   s.purposes = toArr(s.purposes).filter(p=>p && p.id && p.label);
   if(!s.purposes.length) s.purposes = DEFAULT_PURPOSES.slice();
+  s.brk = (s.brk && typeof s.brk==='object' && !Array.isArray(s.brk)) ? s.brk : {};
+  s.brk.on = !!s.brk.on;
   if(s.currentToken!=null && Object.keys(s.serving).length===0) s.serving['1']=s.currentToken; // migrate single→counter 1
   s.seq = s.seq || s.nextId || (s.tokens.length ? Math.max(...s.tokens.map(t=>t.id))+1 : 1);
   s.nextNormal = s.nextNormal || 6;
@@ -561,6 +575,8 @@ function applyOp(s, op, d){
     if(d.name) s.hospitalName=d.name;
   } else if(op==='set-purposes'){
     if(Array.isArray(d.purposes) && d.purposes.length) s.purposes = d.purposes;
+  } else if(op==='set-break'){
+    s.brk = { on: !!d.on, until: d.until||'', msg: d.msg||'' };
   } else if(op==='reset'){
     return freshState(s.hospitalName, s.counters);
   }
@@ -728,6 +744,10 @@ function render(){
   renderCounters(s);
   const csel = document.getElementById('counterSel');
   if (csel && document.activeElement !== csel) csel.value = String(s.counters || 1);
+  const bs = document.getElementById('breakStatus');
+  if (bs) bs.innerHTML = (s.brk && s.brk.on)
+    ? `<span style="color:var(--warning)">● ON BREAK${s.brk.until?(' · back at '+esc(s.brk.until)):''}</span>`
+    : `<span style="color:var(--text-muted)">Not on break</span>`;
 
   // queue (server already orders emergencies first)
   document.getElementById('qCount').textContent = s.queue.length;
@@ -874,6 +894,15 @@ document.getElementById('saveNameBtn').onclick = async () => {
   if (await op('set-name', { name: v })) toast('Organisation name saved');
 };
 document.getElementById('counterSel').onchange = (e) => setCounters(parseInt(e.target.value,10));
+
+/* ---- Break time ---- */
+function to12h(t){ if(!t) return ''; const p=t.split(':'); let h=parseInt(p[0],10); const m=p[1]||'00'; const ap=h>=12?'PM':'AM'; h=h%12||12; return h+':'+m+' '+ap; }
+document.getElementById('startBreakBtn').onclick = async () => {
+  const until = to12h(document.getElementById('breakUntil').value);
+  const msg = document.getElementById('breakMsg').value.trim();
+  if (await op('set-break', { on:true, until, msg })) toast('Break started');
+};
+document.getElementById('endBreakBtn').onclick = async () => { if (await op('set-break', { on:false })) toast('Break ended'); };
 
 /* ---- Issue types (form dropdown) editor ---- */
 function purposeRow(label){
