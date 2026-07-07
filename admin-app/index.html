@@ -915,6 +915,14 @@ function renderBreakEditor(){
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
         <button class="btn btn-success bk-save"><i class="ti ti-check"></i> Save</button>
         <button class="btn btn-ghost bk-off">Turn Off</button>
+        <select class="bk-dur" style="height:42px;padding:0 10px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);border-radius:var(--radius-md);font-size:14px;font-family:inherit">
+          <option value="15">15 min</option>
+          <option value="30">30 min</option>
+          <option value="45">45 min</option>
+          <option value="60" selected>1 hr</option>
+          <option value="90">1 hr 30 min</option>
+          <option value="120">2 hr</option>
+        </select>
         <button class="btn btn-skip bk-start"><i class="ti ti-coffee"></i> Break Now</button>
         <button class="btn btn-ghost bk-end">End Now</button>
       </div>
@@ -930,7 +938,13 @@ function renderBreakEditor(){
       if(await op('set-break',{counter:c, brk:{enabled:true, from, to, on:false}})) toast('Counter '+c+' break saved');
     };
     row.querySelector('.bk-off').onclick   = async () => { if(await op('set-break',{counter:c, brk:{enabled:false, on:false}})) toast('Counter '+c+' break off'); };
-    row.querySelector('.bk-start').onclick = async () => { if(await op('set-break',{counter:c, brk:{on:true}})) toast('Counter '+c+' on break'); };
+    row.querySelector('.bk-start').onclick = async () => {
+      const mins = parseInt(row.querySelector('.bk-dur').value,10) || 60;
+      const now = new Date();
+      const hhmm = d => String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+      const from = hhmm(now), to = hhmm(new Date(now.getTime()+mins*60000));
+      if(await op('set-break',{counter:c, brk:{on:true, enabled:false, from, to}})) toast('Counter '+c+' on break');
+    };
     row.querySelector('.bk-end').onclick   = async () => { if(await op('set-break',{counter:c, brk:{on:false}})) toast('Counter '+c+' break ended'); };
   });
 }
