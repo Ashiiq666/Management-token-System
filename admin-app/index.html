@@ -388,6 +388,8 @@ td .tok { font-weight: 800; color: var(--brand); }
         <h3>QR Code Generator</h3>
         <p>Enter the complaint form URL. Users scan this to register a complaint.</p>
         <input type="text" id="qrUrl" placeholder="https://your-complaint-form.vercel.app">
+        <label style="display:block;font-size:12px;font-weight:600;margin:10px 0 4px">Subtitle (shown under the title on the printed QR)</label>
+        <input type="text" id="qrSubtitle" placeholder="Scan to register your complaint & get a token" style="margin-bottom:6px">
         <button class="btn btn-ghost" id="genQrBtn"><i class="ti ti-qrcode"></i> Generate QR</button>
         <div id="qrcode"></div>
         <div id="qrActions" style="display:none; gap:10px; margin-top:14px">
@@ -979,6 +981,13 @@ document.getElementById('savePurposesBtn').onclick = async () => {
   });
   if (await op('set-purposes', { purposes })) toast('Issue types saved');
 };
+// Remember the QR subtitle across sessions (per admin device)
+(function(){
+  const el = document.getElementById('qrSubtitle');
+  const saved = localStorage.getItem('qrSubtitle');
+  if(saved!=null) el.value = saved;
+  el.addEventListener('input', () => localStorage.setItem('qrSubtitle', el.value));
+})();
 document.getElementById('genQrBtn').onclick = () => {
   const url = document.getElementById('qrUrl').value.trim() || (location.origin + '/form/');
   const box = document.getElementById('qrcode'); box.innerHTML='';
@@ -1010,7 +1019,7 @@ document.getElementById('printQrBtn').onclick = () => {
     .foot { margin-top:26px; font-size:14px; color:#94a3b8; }
   </style></head><body>
     <h1>${esc(CONFIG.hospitalName)}</h1>
-    <p>Scan to register your complaint &amp; get a token</p>
+    <p>${esc((document.getElementById('qrSubtitle').value||'').trim() || 'Scan to register your complaint & get a token')}</p>
     <img src="${data}">
     <div class="foot">Point your phone camera at the code</div>
   </body></html>`);
