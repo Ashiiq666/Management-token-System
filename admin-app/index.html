@@ -333,7 +333,7 @@ td .tok { font-weight: 800; color: var(--brand); }
         <button class="btn btn-ghost" id="exportBtn"><i class="ti ti-download"></i> Export CSV</button>
       </div>
       <table>
-        <thead><tr><th>Token</th><th>Name</th><th>Phone</th><th>Purpose</th><th>Status</th><th>Registered</th><th>VIP</th></tr></thead>
+        <thead><tr><th>Token</th><th>Name</th><th>Phone</th><th>Purpose</th><th>Status</th><th>Registered</th><th>VIP</th><th>Delete</th></tr></thead>
         <tbody id="regBody"></tbody>
       </table>
     </section>
@@ -578,6 +578,12 @@ function applyOp(s, op, d){
     const C = String(d.counter || 1);
     s.breaks = s.breaks || {};
     s.breaks[C] = Object.assign({ enabled:false, from:'', to:'', msg:'', on:false }, s.breaks[C]||{}, d.brk||{});
+  } else if(op==='del-token'){
+    s.tokens = s.tokens.filter(t=>t.id!==d.id);
+    s.queue = s.queue.filter(x=>x!==d.id);
+    s.pending = s.pending.filter(x=>x!==d.id);
+    s.vip = s.vip.filter(x=>x!==d.id);
+    if(s.serving){ Object.keys(s.serving).forEach(k=>{ if(s.serving[k]===d.id) s.serving[k]=null; }); }
   } else if(op==='reset'){
     return freshState(s.hospitalName, s.counters);
   }
@@ -703,6 +709,14 @@ async function vipAdd(id){
   if (await op('vip-add', { id })) toast('★ Added to VIP queue');
 }
 async function vipRemove(id){ if (await op('vip-remove', { id })) toast('Removed from VIP queue'); }
+async function delToken(id){
+  const t = state && state.tokens.find(x=>x.id===id);
+  const label = t ? (t.isVip?('VIP #'+t.vipNo):('Token '+String(t.no).padStart(2,'0'))) : ('#'+id);
+  showModal(`<h3>Delete registration?</h3><p>Permanently remove <strong>${esc(t?t.name:'')}</strong> (${label}) from today's data. This cannot be undone.</p>
+    <div class="modal-actions"><button class="btn btn-ghost" id="dtc">Cancel</button><button class="btn btn-danger" id="dtok"><i class="ti ti-trash"></i> Delete</button></div>`);
+  document.getElementById('dtc').onclick = closeModal;
+  document.getElementById('dtok').onclick = async () => { if(await op('del-token',{id})) toast('Registration deleted'); closeModal(); };
+}
 
 /* ---- Re-insert ---- */
 function openReinsert(id){
@@ -852,7 +866,7 @@ function renderTable(){
     return true;
   });
   const tb = document.getElementById('regBody');
-  if (!rows.length){ tb.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:30px">No matching registrations</td></tr>`; return; }
+  if (!rows.length){ tb.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:30px">No matching registrations</td></tr>`; return; }
   tb.innerHTML = rows.map(t=>{
     // Star toggle only for people still in the queue (waiting/pending), not serving/done
     const canVip = (t.status==='waiting' || t.status==='pending');
@@ -865,7 +879,8 @@ function renderTable(){
       <td><span class="badge ${t.purpose}">${purposeLabel(t.purpose)}</span></td>
       <td><span class="st ${t.status}">${t.status}</span></td>
       <td>${t.registeredAt}</td>
-      <td>${star}</td></tr>`;
+      <td>${star}</td>
+      <td><button title="Delete registration" onclick="delToken(${t.id})" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:18px;line-height:1"><i class="ti ti-trash"></i></button></td></tr>`;
   }).join('');
 }
 ['searchInp','filterPurpose','filterStatus'].forEach(id=>document.getElementById(id).addEventListener('input', renderTable));
