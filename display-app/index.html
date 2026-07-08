@@ -64,6 +64,8 @@ header {
 .sound-toggle { position:fixed; bottom:18px; left:18px; z-index:70; display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:999px; border:1px solid var(--border); background:var(--panel); color:var(--muted); font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.08); }
 .sound-toggle.on { background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border-color:transparent; }
 .sound-toggle i { font-size:18px; }
+.sound-toggle.needstap { background:linear-gradient(135deg,#f59e0b,#f97316); color:#fff; border-color:transparent; animation:soundPulse 1.4s ease-in-out infinite; }
+@keyframes soundPulse { 0%,100%{ box-shadow:0 0 0 0 rgba(245,158,11,.55); } 50%{ box-shadow:0 0 0 12px rgba(245,158,11,0); } }
 
 /* Main */
 .main { height:calc(100vh - 70px); display:flex; }
@@ -315,7 +317,11 @@ function applyAnnounceCfg(s){
 }
 const soundToggle=document.getElementById('soundToggle');
 function updateSoundBtn(){
-  if(!audioUnlocked){
+  if(!audioUnlocked && announceCfg.on){
+    // Admin turned it on but this screen hasn't granted audio yet — make the required tap obvious.
+    soundToggle.className='sound-toggle needstap';
+    soundToggle.innerHTML='<i class="ti ti-bell-ringing"></i> Tap to enable sound';
+  } else if(!audioUnlocked){
     soundToggle.className='sound-toggle';
     soundToggle.innerHTML='<i class="ti ti-volume-off"></i> Enable sound';
   } else if(announceCfg.on){
