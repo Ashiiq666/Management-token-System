@@ -659,7 +659,15 @@ document.querySelectorAll('.nav-item').forEach(it => {
   };
 });
 document.getElementById('menuBtn').onclick = () => document.getElementById('sidebar').classList.toggle('open');
-document.getElementById('displayLink').onclick = () => window.open('../display-app/','_blank');
+document.getElementById('displayLink').onclick = () => {
+  // Admin and display are separate deployments (…-admin vs …-display). Derive the display URL;
+  // fall back to a relative path for local dev where one server hosts all folders.
+  const saved = localStorage.getItem('displayUrl');
+  const url = saved || (location.hostname.includes('admin')
+    ? location.origin.replace('admin','display') + '/'
+    : '../display-app/');
+  window.open(url,'_blank');
+};
 
 /* ---- Queue actions (atomic Firebase transactions) ---- */
 async function callNext(counter){
