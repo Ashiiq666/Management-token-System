@@ -60,6 +60,10 @@ header {
 .break-screen .bk-msg { font-size:26px; color:var(--muted); font-weight:600; margin-top:10px; }
 .break-screen .bk-until { font-size:34px; font-weight:800; color:var(--brand); margin-top:22px; }
 .break-screen .bk-clock { font-size:80px; font-weight:900; margin-top:24px; color:var(--text); font-variant-numeric:tabular-nums; }
+/* Announcement enable toggle */
+.sound-toggle { position:fixed; bottom:18px; left:18px; z-index:70; display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:999px; border:1px solid var(--border); background:var(--panel); color:var(--muted); font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.08); }
+.sound-toggle.on { background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border-color:transparent; }
+.sound-toggle i { font-size:18px; }
 
 /* Main */
 .main { height:calc(100vh - 70px); display:flex; }
@@ -165,6 +169,9 @@ header {
   </div>
 </div>
 
+<!-- Voice announcement toggle (tap once to allow the browser to play sound) -->
+<button id="soundToggle" class="sound-toggle"><i class="ti ti-volume-off"></i> Enable announcements</button>
+
 <!-- BREAK overlay -->
 <div class="break-screen" id="breakScreen">
   <div class="bk-icon"><i class="ti ti-coffee"></i></div>
@@ -263,6 +270,46 @@ function breakSig(s){
 }
 function updateBreak(){ if(curState){ const sig=breakSig(curState); if(sig!==lastBreakSig) renderServe(curState); } }
 
+/* ---- Voice announcements (browser text-to-speech; free, offline) ---- */
+let announceOn = localStorage.getItem('announceOn')==='1';
+let announcedInit = false;   // don't announce tokens already being served on first load
+let audioCtx;
+function beep(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+    [880,1175].forEach((f,i)=>{
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.type='sine'; o.frequency.value=f; o.connect(g); g.connect(audioCtx.destination);
+      const t=audioCtx.currentTime+i*0.16;
+      g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.25,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.15);
+      o.start(t); o.stop(t+0.16);
+    });
+  }catch(e){}
+}
+function speak(text){
+  try{ const u=new SpeechSynthesisUtterance(text); u.rate=0.95; u.pitch=1; u.lang='en-US'; speechSynthesis.speak(u); }catch(e){}
+}
+function announceToken(t, c, n){
+  if(!announceOn) return;
+  const who = t.isVip ? ('V I P number '+t.vipNo) : ('Token number '+t.no);
+  const where = n>1 ? ('counter '+c) : 'the counter';
+  beep();
+  setTimeout(()=>speak(who+', please proceed to '+where), 380);
+}
+const soundToggle=document.getElementById('soundToggle');
+function updateSoundBtn(){
+  soundToggle.classList.toggle('on', announceOn);
+  soundToggle.innerHTML = announceOn ? '<i class="ti ti-volume"></i> Announcements on' : '<i class="ti ti-volume-off"></i> Enable announcements';
+}
+soundToggle.onclick = () => {
+  announceOn = !announceOn;
+  localStorage.setItem('announceOn', announceOn?'1':'0');
+  updateSoundBtn();
+  if(announceOn){ beep(); speak('Announcements enabled'); }  // unlock audio within this tap
+};
+updateSoundBtn();
+
 /* State comes from the shared server */
 let lastServing = {};
 let lastBreakSig = '';
@@ -272,6 +319,7 @@ function renderServe(s){
   const area = document.getElementById('serveArea');
   area.className = 'left ' + (n>1 ? 'multi' : 'single');
   let html = '';
+  const toAnnounce = [];
   for (let c=1; c<=n; c++){
     const b = (s.breaks||{})[String(c)] || {};
     if (breakOn(b, now)){
@@ -291,6 +339,7 @@ function renderServe(s){
     const t = (id!=null) ? s.tokens.find(x=>x.id===id) : null;
     const changed = lastServing[c] !== id;
     if (t){
+      if(changed && id!=null) toAnnounce.push({t, c});
       html += `<div class="serve-block ${changed?'pop':''}">
         <div class="now-lbl">Now Serving${n>1?' · Counter '+c:''}</div>
         <div class="token-stage"><div class="big-token has">${pad(t.isVip ? t.vipNo : t.no)}</div></div>
@@ -311,6 +360,8 @@ function renderServe(s){
   }
   area.innerHTML = html;
   lastBreakSig = breakSig(s);
+  if(announcedInit){ toAnnounce.forEach((a,i)=> setTimeout(()=>announceToken(a.t, a.c, n), i*2200)); }
+  announcedInit = true;
 }
 function render(s){
   if (!s) return;
