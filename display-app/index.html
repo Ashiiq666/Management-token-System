@@ -271,42 +271,66 @@ function breakSig(s){
 function updateBreak(){ if(curState){ const sig=breakSig(curState); if(sig!==lastBreakSig) renderServe(curState); } }
 
 /* ---- Voice announcements (browser text-to-speech; free, offline) ---- */
-let announceOn = localStorage.getItem('announceOn')==='1';
+/* On/off + volume/speed/language are controlled from the admin panel (state.announce).
+   Each display still needs one tap to unlock audio (browser autoplay rule). */
+let audioUnlocked = localStorage.getItem('audioUnlocked')==='1';
+let announceCfg = { on:false, volume:1, rate:0.95, lang:'en-US' };
 let announcedInit = false;   // don't announce tokens already being served on first load
 let audioCtx;
 function beep(){
   try{
     audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
     if(audioCtx.state==='suspended') audioCtx.resume();
+    const vol = announceCfg.volume==null ? 1 : announceCfg.volume;
     [880,1175].forEach((f,i)=>{
       const o=audioCtx.createOscillator(), g=audioCtx.createGain();
       o.type='sine'; o.frequency.value=f; o.connect(g); g.connect(audioCtx.destination);
       const t=audioCtx.currentTime+i*0.16;
-      g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.25,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.15);
+      g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.25*vol,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.15);
       o.start(t); o.stop(t+0.16);
     });
   }catch(e){}
 }
 function speak(text){
-  try{ const u=new SpeechSynthesisUtterance(text); u.rate=0.95; u.pitch=1; u.lang='en-US'; speechSynthesis.speak(u); }catch(e){}
+  try{
+    const u=new SpeechSynthesisUtterance(text);
+    u.rate=announceCfg.rate||0.95; u.pitch=1;
+    u.volume=announceCfg.volume==null?1:announceCfg.volume;
+    u.lang=announceCfg.lang||'en-US';
+    speechSynthesis.speak(u);
+  }catch(e){}
 }
+function canAnnounce(){ return !!announceCfg.on && audioUnlocked; }
 function announceToken(t, c, n){
-  if(!announceOn) return;
+  if(!canAnnounce()) return;
   const who = t.isVip ? ('V I P number '+t.vipNo) : ('Token number '+t.no);
   const where = n>1 ? ('counter '+c) : 'the counter';
   beep();
   setTimeout(()=>speak(who+', please proceed to '+where), 380);
 }
+function applyAnnounceCfg(s){
+  const a = (s && s.announce) || {};
+  announceCfg = { on:!!a.on, volume:a.volume==null?1:a.volume, rate:a.rate==null?0.95:a.rate, lang:a.lang||'en-US' };
+  updateSoundBtn();
+}
 const soundToggle=document.getElementById('soundToggle');
 function updateSoundBtn(){
-  soundToggle.classList.toggle('on', announceOn);
-  soundToggle.innerHTML = announceOn ? '<i class="ti ti-volume"></i> Announcements on' : '<i class="ti ti-volume-off"></i> Enable announcements';
+  if(!audioUnlocked){
+    soundToggle.className='sound-toggle';
+    soundToggle.innerHTML='<i class="ti ti-volume-off"></i> Enable sound';
+  } else if(announceCfg.on){
+    soundToggle.className='sound-toggle on';
+    soundToggle.innerHTML='<i class="ti ti-volume"></i> Sound ready';
+  } else {
+    soundToggle.className='sound-toggle';
+    soundToggle.innerHTML='<i class="ti ti-volume-3"></i> Announcements off (admin)';
+  }
 }
 soundToggle.onclick = () => {
-  announceOn = !announceOn;
-  localStorage.setItem('announceOn', announceOn?'1':'0');
+  audioUnlocked = true;
+  localStorage.setItem('audioUnlocked','1');
   updateSoundBtn();
-  if(announceOn){ beep(); speak('Announcements enabled'); }  // unlock audio within this tap
+  beep(); speak('Announcements enabled');  // unlock audio within this tap
 };
 updateSoundBtn();
 
@@ -366,6 +390,7 @@ function renderServe(s){
 function render(s){
   if (!s) return;
   curState = s;
+  applyAnnounceCfg(s);
   renderServe(s);
 
   // up next (3)

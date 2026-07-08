@@ -385,6 +385,38 @@ td .tok { font-weight: 800; color: var(--brand); }
         <div id="breakEditor"></div>
       </div>
       <div class="settings-card">
+        <h3>Voice Announcements (Display)</h3>
+        <p>When a token is called, the display screen speaks it out loud. These settings apply to all display screens. <strong>Note:</strong> each display still needs one tap on its “Enable sound” button the first time (browser rule).</p>
+        <label style="display:flex;align-items:center;gap:10px;font-weight:700;margin:6px 0 14px;cursor:pointer">
+          <input type="checkbox" id="annOn" style="width:20px;height:20px"> Enable voice announcements
+        </label>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:1;min-width:180px">
+            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px">Volume: <span id="annVolVal">100%</span></label>
+            <input type="range" id="annVol" min="0" max="100" value="100" style="width:100%">
+          </div>
+          <div style="flex:1;min-width:180px">
+            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px">Speed: <span id="annRateVal">0.95×</span></label>
+            <input type="range" id="annRate" min="60" max="130" value="95" style="width:100%">
+          </div>
+          <div style="flex:1;min-width:180px">
+            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px">Language / voice</label>
+            <select id="annLang" style="height:42px;width:100%;padding:0 10px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);border-radius:var(--radius-md);font-size:14px;font-family:inherit">
+              <option value="en-US">English (US)</option>
+              <option value="en-GB">English (UK)</option>
+              <option value="en-IN">English (India)</option>
+              <option value="ar-SA">Arabic</option>
+              <option value="hi-IN">Hindi</option>
+              <option value="ml-IN">Malayalam</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+          <button class="btn btn-success" id="annSave"><i class="ti ti-check"></i> Save</button>
+          <button class="btn btn-ghost" id="annTest"><i class="ti ti-volume"></i> Test on this device</button>
+        </div>
+      </div>
+      <div class="settings-card">
         <h3>QR Code Generator</h3>
         <p>Enter the complaint form URL. Users scan this to register a complaint.</p>
         <input type="text" id="qrUrl" placeholder="https://your-complaint-form.vercel.app">
@@ -578,6 +610,8 @@ function applyOp(s, op, d){
     const C = String(d.counter || 1);
     s.breaks = s.breaks || {};
     s.breaks[C] = Object.assign({ enabled:false, from:'', to:'', msg:'', on:false }, s.breaks[C]||{}, d.brk||{});
+  } else if(op==='set-announce'){
+    s.announce = Object.assign({ on:false, volume:1, rate:0.95, lang:'en-US' }, s.announce||{}, d.announce||{});
   } else if(op==='del-token'){
     s.tokens = s.tokens.filter(t=>t.id!==d.id);
     s.queue = s.queue.filter(x=>x!==d.id);
@@ -661,7 +695,7 @@ document.querySelectorAll('.nav-item').forEach(it => {
     document.getElementById('tab-'+tab).classList.add('active');
     document.getElementById('mobileTitle').textContent = it.textContent.trim();
     document.getElementById('sidebar').classList.remove('open');
-    if (tab==='settings') { renderPurposeEditor(); renderBreakEditor(); }
+    if (tab==='settings') { renderPurposeEditor(); renderBreakEditor(); renderAnnounceEditor(); }
   };
 });
 document.getElementById('menuBtn').onclick = () => document.getElementById('sidebar').classList.toggle('open');
@@ -674,6 +708,40 @@ document.getElementById('displayLink').onclick = () => {
     : '../display-app/');
   window.open(url,'_blank');
 };
+
+/* ---- Voice announcement settings (synced to display via state.announce) ---- */
+function announceCfg(){ return Object.assign({ on:false, volume:1, rate:0.95, lang:'en-US' }, (state&&state.announce)||{}); }
+function renderAnnounceEditor(){
+  if(!state) return;
+  const a = announceCfg();
+  const on=document.getElementById('annOn'), vol=document.getElementById('annVol'), rate=document.getElementById('annRate'), lang=document.getElementById('annLang');
+  if([on,vol,rate,lang].some(el=>el===document.activeElement)) return; // don't stomp while editing
+  on.checked = !!a.on;
+  vol.value = Math.round((a.volume??1)*100); document.getElementById('annVolVal').textContent = vol.value+'%';
+  rate.value = Math.round((a.rate??0.95)*100); document.getElementById('annRateVal').textContent = (rate.value/100).toFixed(2)+'×';
+  lang.value = a.lang || 'en-US';
+}
+(function(){
+  const vol=document.getElementById('annVol'), rate=document.getElementById('annRate');
+  vol.addEventListener('input', ()=> document.getElementById('annVolVal').textContent = vol.value+'%');
+  rate.addEventListener('input', ()=> document.getElementById('annRateVal').textContent = (rate.value/100).toFixed(2)+'×');
+  document.getElementById('annSave').onclick = async () => {
+    const announce = {
+      on: document.getElementById('annOn').checked,
+      volume: parseInt(vol.value,10)/100,
+      rate: parseInt(rate.value,10)/100,
+      lang: document.getElementById('annLang').value
+    };
+    if(await op('set-announce',{announce})) toast('Announcement settings saved');
+  };
+  document.getElementById('annTest').onclick = () => {
+    try{
+      const u=new SpeechSynthesisUtterance('Token number 6, please proceed to counter 1');
+      u.volume=parseInt(vol.value,10)/100; u.rate=parseInt(rate.value,10)/100; u.lang=document.getElementById('annLang').value;
+      speechSynthesis.speak(u);
+    }catch(e){ toast('Voice not supported on this device'); }
+  };
+})();
 
 /* ---- Queue actions (atomic Firebase transactions) ---- */
 async function callNext(counter){
@@ -768,6 +836,7 @@ function render(){
   const csel = document.getElementById('counterSel');
   if (csel && document.activeElement !== csel) csel.value = String(s.counters || 1);
   if (document.getElementById('tab-settings').classList.contains('active') && !document.querySelector('#breakEditor input:focus')) renderBreakEditor();
+  if (document.getElementById('tab-settings').classList.contains('active')) renderAnnounceEditor();
 
   // queue (server already orders emergencies first)
   document.getElementById('qCount').textContent = s.queue.length;
