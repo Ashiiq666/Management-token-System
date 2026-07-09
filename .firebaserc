@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "flydubai-17161"
+  },
+  "targets": {
+    "flydubai-17161": {
+      "hosting": {
+        "admin": ["itboothqms-admin"],
+        "complaints": ["itboothqms-complaints"],
+        "display": ["itboothqms-display"]
+      }
+    }
+  }
+}

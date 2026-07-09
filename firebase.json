@@ -1,0 +1,19 @@
+{
+  "hosting": [
+    {
+      "target": "admin",
+      "public": "admin-app",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+    },
+    {
+      "target": "complaints",
+      "public": "form",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+    },
+    {
+      "target": "display",
+      "public": "display-app",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+    }
+  ]
+}
