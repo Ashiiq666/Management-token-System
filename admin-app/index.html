@@ -553,7 +553,7 @@ function tick(){
 // Break auto-off + status refresh — runs only on the interval (after `state` is initialized below).
 function breakTick(){
   autoOffExpiredBreaks();
-  if(document.getElementById('tab-settings').classList.contains('active') && !document.querySelector('#breakEditor input:focus')) renderBreakEditor();
+  refreshBreakStatus(); // status text only — never rebuilds inputs
 }
 tick(); setInterval(()=>{ tick(); breakTick(); },1000);
 
@@ -747,7 +747,7 @@ document.querySelectorAll('.nav-item').forEach(it => {
     document.getElementById('tab-'+tab).classList.add('active');
     document.getElementById('mobileTitle').textContent = it.textContent.trim();
     document.getElementById('sidebar').classList.remove('open');
-    if (tab==='settings') { renderPurposeEditor(); renderBreakEditor(); renderAnnounceEditor(); }
+    if (tab==='settings') { renderPurposeEditor(); renderBreakEditor(true); renderAnnounceEditor(); }
   };
 });
 document.getElementById('menuBtn').onclick = () => document.getElementById('sidebar').classList.toggle('open');
@@ -887,7 +887,7 @@ function render(){
   renderCounters(s);
   const csel = document.getElementById('counterSel');
   if (csel && document.activeElement !== csel) csel.value = String(s.counters || 1);
-  if (document.getElementById('tab-settings').classList.contains('active') && !document.querySelector('#breakEditor input:focus')) renderBreakEditor();
+  if (document.getElementById('tab-settings').classList.contains('active')) renderBreakEditor();
   if (document.getElementById('tab-settings').classList.contains('active')) renderAnnounceEditor();
 
   // queue (server already orders emergencies first)
@@ -1061,9 +1061,23 @@ function autoOffExpiredBreaks(){
     }
   });
 }
-function renderBreakEditor(){
+const _hhmm = d => String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+const _addMins = (hhmm, mins) => { const [h,m]=hhmm.split(':').map(Number); let t=(h*60+m+mins)%(24*60); if(t<0)t+=24*60; return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'); };
+// Only update the status lines — never rebuilds inputs, so typed times / dropdown are never wiped.
+function refreshBreakStatus(){
+  if(!state || !state.breaks) return;
+  document.querySelectorAll('#breakEditor .brk-row').forEach(row => {
+    const b = (state.breaks||{})[String(row.dataset.c)] || {};
+    const st = row.querySelector('.bk-status');
+    if(st) st.innerHTML = breakStatusText(b);
+  });
+}
+function renderBreakEditor(force){
   const box = document.getElementById('breakEditor'); if(!box || !state) return;
   const n = state.counters || 1;
+  // Rebuild only when the structure changes (or forced) — otherwise just refresh status,
+  // so the user's in-progress From/To and duration selection are preserved.
+  if(!force && box.querySelectorAll('.brk-row').length === n){ refreshBreakStatus(); return; }
   const breaks = state.breaks || {};
   let html = '';
   for(let c=1;c<=n;c++){
@@ -1073,18 +1087,22 @@ function renderBreakEditor(){
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
         <div><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">From</label><input type="time" class="bk-from" value="${b.from||''}"></div>
         <div><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">To</label><input type="time" class="bk-to" value="${b.to||''}"></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Duration</label>
+          <select class="bk-dur" style="height:42px;padding:0 10px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);border-radius:var(--radius-md);font-size:14px;font-family:inherit">
+            <option value="">Custom</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="45">45 min</option>
+            <option value="60">1 hr</option>
+            <option value="90">1 hr 30 min</option>
+            <option value="120">2 hr</option>
+          </select>
+        </div>
       </div>
+      <p style="font-size:12px;color:var(--text-secondary);margin:8px 0 0">Pick a Duration to auto-fill “To”, or type both times. <strong>Save</strong> = scheduled window (shows on display, ends automatically at “To”). <strong>Break Now</strong> = start immediately for the selected duration.</p>
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
         <button class="btn btn-success bk-save"><i class="ti ti-check"></i> Save</button>
         <button class="btn btn-ghost bk-off">Turn Off</button>
-        <select class="bk-dur" style="height:42px;padding:0 10px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);border-radius:var(--radius-md);font-size:14px;font-family:inherit">
-          <option value="15">15 min</option>
-          <option value="30">30 min</option>
-          <option value="45">45 min</option>
-          <option value="60" selected>1 hr</option>
-          <option value="90">1 hr 30 min</option>
-          <option value="120">2 hr</option>
-        </select>
         <button class="btn btn-skip bk-start"><i class="ti ti-coffee"></i> Break Now</button>
         <button class="btn btn-ghost bk-end">End Now</button>
       </div>
@@ -1094,17 +1112,24 @@ function renderBreakEditor(){
   box.innerHTML = html;
   box.querySelectorAll('.brk-row').forEach(row => {
     const c = parseInt(row.dataset.c,10);
+    const fromEl = row.querySelector('.bk-from'), toEl = row.querySelector('.bk-to'), durEl = row.querySelector('.bk-dur');
+    // Selecting a duration fills "To" = From + duration (defaults From to now if empty).
+    durEl.onchange = () => {
+      const mins = parseInt(durEl.value,10);
+      if(!mins) return; // "Custom" — leave times as typed
+      if(!fromEl.value) fromEl.value = _hhmm(new Date());
+      toEl.value = _addMins(fromEl.value, mins);
+    };
     row.querySelector('.bk-save').onclick = async () => {
-      const from=row.querySelector('.bk-from').value, to=row.querySelector('.bk-to').value;
-      if(!from||!to){ toast('Set both From and To'); return; }
+      const from=fromEl.value, to=toEl.value;
+      if(!from||!to){ toast('Set From and To (or pick a Duration)'); return; }
       if(await op('set-break',{counter:c, brk:{enabled:true, from, to, on:false, until:0}})) toast('Counter '+c+' break saved');
     };
     row.querySelector('.bk-off').onclick   = async () => { if(await op('set-break',{counter:c, brk:{enabled:false, on:false, until:0}})) toast('Counter '+c+' break off'); };
     row.querySelector('.bk-start').onclick = async () => {
-      const mins = parseInt(row.querySelector('.bk-dur').value,10) || 60;
+      const mins = parseInt(durEl.value,10) || 60;
       const now = new Date();
-      const hhmm = d => String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-      const from = hhmm(now), to = hhmm(new Date(now.getTime()+mins*60000));
+      const from = _hhmm(now), to = _hhmm(new Date(now.getTime()+mins*60000));
       // Store an absolute end time so the break turns itself off after the duration.
       if(await op('set-break',{counter:c, brk:{on:true, enabled:false, from, to, until: now.getTime()+mins*60000}})) toast('Counter '+c+' on break');
     };
