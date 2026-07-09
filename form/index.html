@@ -310,12 +310,12 @@ input.inp::placeholder, textarea.inp::placeholder { color: var(--text-muted); }
         </div>
 
         <div class="field">
-          <label>Phone Number <span class="req">*</span></label>
+          <label>Staff Number <span style="color:var(--text-muted);font-weight:500">(optional)</span></label>
           <div class="input-wrap">
-            <input class="inp" id="f_phone" type="tel" inputmode="tel" maxlength="20" placeholder="e.g. 050 123 4567" required>
+            <input class="inp" id="f_phone" type="text" maxlength="20" placeholder="e.g. 12345">
             <i class="ti ti-circle-check check-icon" id="chk_phone"></i>
           </div>
-          <div class="err-msg" id="err_phone">Please enter a phone number.</div>
+          <div class="err-msg" id="err_phone">Please enter a valid staff number.</div>
         </div>
 
         <div class="field">
@@ -477,11 +477,11 @@ ta.oninput = () => { document.getElementById('charCount').textContent = ta.value
 /* ---------- Validation ---------- */
 const nameI = document.getElementById('f_name');
 const phoneI = document.getElementById('f_phone');
-// Allow international/UAE formats: digits, +, spaces, dashes, parentheses
-phoneI.addEventListener('input', () => { phoneI.value = phoneI.value.replace(/[^\d+\-\s()]/g,'').slice(0,20); });
+// Staff number: allow digits and letters (optional field)
+phoneI.addEventListener('input', () => { phoneI.value = phoneI.value.replace(/[^a-zA-Z0-9\-\s]/g,'').slice(0,20); });
 
 function vName() { return nameI.value.trim().length >= 2; }
-function vPhone() { return phoneI.value.replace(/\D/g,'').length >= 6; }
+function vPhone() { return true; } // Staff number is optional — never blocks submit
 
 function applyState(inp, chk, err, ok) {
   if (inp.value === '') { inp.classList.remove('valid','invalid'); chk.classList.remove('show'); err.classList.remove('show'); return; }
@@ -491,7 +491,7 @@ function applyState(inp, chk, err, ok) {
 function validateAll() {
   applyState(nameI, document.getElementById('chk_name'), document.getElementById('err_name'), vName());
   applyState(phoneI, document.getElementById('chk_phone'), document.getElementById('err_phone'), vPhone());
-  const ok = vName() && vPhone() && selectedPurpose;
+  const ok = vName() && selectedPurpose;
   document.getElementById('submitBtn').disabled = !ok;
   return ok;
 }
