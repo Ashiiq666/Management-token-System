@@ -251,8 +251,8 @@ td .tok { font-weight: 800; color: var(--brand); }
   <div class="pin-card">
     <div class="pin-logo"><i class="ti ti-lock"></i></div>
     <h2>Sign In</h2>
-    <p>Admin: password only. Staff: username + password.</p>
-    <input class="pin-input" id="userInput" type="text" inputmode="text" autocapitalize="none" autocorrect="off" autocomplete="username" spellcheck="false" maxlength="30" placeholder="Username (staff only)" style="letter-spacing:1px;text-align:left;padding:0 16px;font-size:16px;margin-bottom:10px">
+    <p>Enter your username and password.</p>
+    <input class="pin-input" id="userInput" type="text" inputmode="text" autocapitalize="none" autocorrect="off" autocomplete="username" spellcheck="false" maxlength="30" placeholder="Username" style="letter-spacing:1px;text-align:left;padding:0 16px;font-size:16px;margin-bottom:10px">
     <!-- text PIN (letters + numbers), full keyboard on mobile -->
     <input class="pin-input" id="pinInput" type="text" inputmode="text" autocapitalize="none" autocorrect="off" autocomplete="current-password" spellcheck="false" maxlength="20" placeholder="Enter password" style="-webkit-text-security:disc;text-security:disc;letter-spacing:4px">
     <button class="pin-btn" id="pinBtn">Sign In</button>
@@ -463,6 +463,8 @@ const CONFIG = {
   ],
   storageKey: "hospitalTokenData",
   broadcastChannel: "hospital-token-channel",
+  // Admin login: full access
+  adminUser: "flydubai@admin",
   adminPassword: "Amal123",
   // Front-office staff login: limited to Dashboard + Registrations
   staffUser: "flydubai",
@@ -670,7 +672,7 @@ function tryPin(){
   const user = document.getElementById('userInput').value.trim();
   const pass = document.getElementById('pinInput').value;
   let role = null;
-  if (!user && pass === CONFIG.adminPassword) role = 'admin';
+  if (user.toLowerCase() === CONFIG.adminUser.toLowerCase() && pass === CONFIG.adminPassword) role = 'admin';
   else if (user.toLowerCase() === CONFIG.staffUser.toLowerCase() && pass === CONFIG.staffPassword) role = 'staff';
   if (role){
     sessionStorage.setItem('adminUnlocked','1');
