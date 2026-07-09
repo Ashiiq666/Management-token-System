@@ -1127,11 +1127,21 @@ function renderBreakEditor(force){
     };
     row.querySelector('.bk-off').onclick   = async () => { if(await op('set-break',{counter:c, brk:{enabled:false, on:false, until:0}})) toast('Counter '+c+' break off'); };
     row.querySelector('.bk-start').onclick = async () => {
-      const mins = parseInt(durEl.value,10) || 60;
       const now = new Date();
-      const from = _hhmm(now), to = _hhmm(new Date(now.getTime()+mins*60000));
-      // Store an absolute end time so the break turns itself off after the duration.
-      if(await op('set-break',{counter:c, brk:{on:true, enabled:false, from, to, until: now.getTime()+mins*60000}})) toast('Counter '+c+' on break');
+      let untilMs, to;
+      if(toEl.value){
+        // Start now, end at the "To" time you set (roll to tomorrow if it's already past).
+        const [th,tm] = toEl.value.split(':').map(Number);
+        const end = new Date(now); end.setHours(th,tm,0,0);
+        if(end.getTime() <= now.getTime()) end.setDate(end.getDate()+1);
+        untilMs = end.getTime(); to = toEl.value;
+      } else {
+        // No "To" set — use the selected duration (default 1 hr).
+        const mins = parseInt(durEl.value,10) || 60;
+        untilMs = now.getTime()+mins*60000; to = _hhmm(new Date(untilMs));
+      }
+      const from = _hhmm(now);
+      if(await op('set-break',{counter:c, brk:{on:true, enabled:false, from, to, until: untilMs}})) toast('Counter '+c+' on break');
     };
     row.querySelector('.bk-end').onclick   = async () => { if(await op('set-break',{counter:c, brk:{on:false, until:0}})) toast('Counter '+c+' break ended'); };
   });
