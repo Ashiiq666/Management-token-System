@@ -264,7 +264,12 @@ function inWindow(b, now){
   const f=fh*60+fm, t=th*60+tm;
   return f<=t ? (cur>=f && cur<t) : (cur>=f || cur<t);
 }
-function breakOn(b, now){ return !!(b && (b.on || inWindow(b, now))); }
+function breakOn(b, now){
+  if(!b) return false;
+  // Manual break: auto-expires once its end time ('until') passes.
+  if(b.on) return !b.until || Date.now() < b.until;
+  return inWindow(b, now);
+}
 function breakSig(s){
   const now=new Date(); const n=s.counters||1; let sig='';
   for(let c=1;c<=n;c++){ sig += breakOn((s.breaks||{})[String(c)]||{}, now) ? '1':'0'; }

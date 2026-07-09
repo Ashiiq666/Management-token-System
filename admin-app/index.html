@@ -549,6 +549,9 @@ function tick(){
   const d=new Date();
   document.getElementById('sbClock').textContent = d.toLocaleTimeString('en-US',{hour12:true});
   document.getElementById('sbDate').textContent = d.toLocaleDateString('en-US',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  autoOffExpiredBreaks();
+  // Keep the break status line fresh while the settings tab is open (no input focused).
+  if(document.getElementById('tab-settings').classList.contains('active') && !document.querySelector('#breakEditor input:focus')) renderBreakEditor();
 }
 tick(); setInterval(tick,1000);
 
@@ -615,7 +618,7 @@ function applyOp(s, op, d){
   } else if(op==='set-break'){
     const C = String(d.counter || 1);
     s.breaks = s.breaks || {};
-    s.breaks[C] = Object.assign({ enabled:false, from:'', to:'', msg:'', on:false }, s.breaks[C]||{}, d.brk||{});
+    s.breaks[C] = Object.assign({ enabled:false, from:'', to:'', msg:'', on:false, until:0 }, s.breaks[C]||{}, d.brk||{});
   } else if(op==='set-announce'){
     s.announce = Object.assign({ on:false, volume:1, rate:0.95, lang:'en-US' }, s.announce||{}, d.announce||{});
   } else if(op==='del-token'){
@@ -1028,11 +1031,27 @@ document.getElementById('counterSel').onchange = (e) => setCounters(parseInt(e.t
 
 /* ---- Break time (per counter) ---- */
 function to12h(t){ if(!t) return ''; const p=t.split(':'); let h=parseInt(p[0],10); const m=p[1]||'00'; const ap=h>=12?'PM':'AM'; h=h%12||12; return h+':'+m+' '+ap; }
+function manualBreakActive(b){ return !!(b && b.on && (!b.until || Date.now() < b.until)); }
 function breakStatusText(b){
   if(!b) return '<span style="color:var(--text-muted)">No break set</span>';
-  if(b.on) return '<span style="color:var(--warning)">● ON BREAK NOW (manual)</span>';
+  if(manualBreakActive(b)){
+    const until = b.until ? ' — until ' + new Date(b.until).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}) : '';
+    return '<span style="color:var(--warning)">● ON BREAK NOW (manual)'+until+'</span>';
+  }
   if(b.enabled && b.from && b.to) return `<span style="color:var(--success)">● Scheduled: ${esc(to12h(b.from))} – ${esc(to12h(b.to))}</span>`;
   return '<span style="color:var(--text-muted)">No break set</span>';
+}
+// Auto-off: once a manual break's end time passes, write it off so the data + UI clear.
+let _breakOffPending = {};
+function autoOffExpiredBreaks(){
+  if(!state || !state.breaks) return;
+  Object.keys(state.breaks).forEach(c => {
+    const b = state.breaks[c];
+    if(b && b.on && b.until && Date.now() >= b.until && !_breakOffPending[c]){
+      _breakOffPending[c] = true;
+      op('set-break',{counter:parseInt(c,10), brk:{on:false, until:0}}).finally(()=>{ _breakOffPending[c]=false; });
+    }
+  });
 }
 function renderBreakEditor(){
   const box = document.getElementById('breakEditor'); if(!box || !state) return;
@@ -1070,17 +1089,18 @@ function renderBreakEditor(){
     row.querySelector('.bk-save').onclick = async () => {
       const from=row.querySelector('.bk-from').value, to=row.querySelector('.bk-to').value;
       if(!from||!to){ toast('Set both From and To'); return; }
-      if(await op('set-break',{counter:c, brk:{enabled:true, from, to, on:false}})) toast('Counter '+c+' break saved');
+      if(await op('set-break',{counter:c, brk:{enabled:true, from, to, on:false, until:0}})) toast('Counter '+c+' break saved');
     };
-    row.querySelector('.bk-off').onclick   = async () => { if(await op('set-break',{counter:c, brk:{enabled:false, on:false}})) toast('Counter '+c+' break off'); };
+    row.querySelector('.bk-off').onclick   = async () => { if(await op('set-break',{counter:c, brk:{enabled:false, on:false, until:0}})) toast('Counter '+c+' break off'); };
     row.querySelector('.bk-start').onclick = async () => {
       const mins = parseInt(row.querySelector('.bk-dur').value,10) || 60;
       const now = new Date();
       const hhmm = d => String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
       const from = hhmm(now), to = hhmm(new Date(now.getTime()+mins*60000));
-      if(await op('set-break',{counter:c, brk:{on:true, enabled:false, from, to}})) toast('Counter '+c+' on break');
+      // Store an absolute end time so the break turns itself off after the duration.
+      if(await op('set-break',{counter:c, brk:{on:true, enabled:false, from, to, until: now.getTime()+mins*60000}})) toast('Counter '+c+' on break');
     };
-    row.querySelector('.bk-end').onclick   = async () => { if(await op('set-break',{counter:c, brk:{on:false}})) toast('Counter '+c+' break ended'); };
+    row.querySelector('.bk-end').onclick   = async () => { if(await op('set-break',{counter:c, brk:{on:false, until:0}})) toast('Counter '+c+' break ended'); };
   });
 }
 
