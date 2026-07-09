@@ -549,11 +549,13 @@ function tick(){
   const d=new Date();
   document.getElementById('sbClock').textContent = d.toLocaleTimeString('en-US',{hour12:true});
   document.getElementById('sbDate').textContent = d.toLocaleDateString('en-US',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+}
+// Break auto-off + status refresh — runs only on the interval (after `state` is initialized below).
+function breakTick(){
   autoOffExpiredBreaks();
-  // Keep the break status line fresh while the settings tab is open (no input focused).
   if(document.getElementById('tab-settings').classList.contains('active') && !document.querySelector('#breakEditor input:focus')) renderBreakEditor();
 }
-tick(); setInterval(tick,1000);
+tick(); setInterval(()=>{ tick(); breakTick(); },1000);
 
 /* ---- State (live from Firebase) ---- */
 let state = null;
