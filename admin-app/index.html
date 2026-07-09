@@ -250,11 +250,12 @@ td .tok { font-weight: 800; color: var(--brand); }
 <div id="pinLock">
   <div class="pin-card">
     <div class="pin-logo"><i class="ti ti-lock"></i></div>
-    <h2>Admin Access</h2>
-    <p>Enter your PIN to continue</p>
+    <h2>Sign In</h2>
+    <p>Admin: password only. Staff: username + password.</p>
+    <input class="pin-input" id="userInput" type="text" inputmode="text" autocapitalize="none" autocorrect="off" autocomplete="username" spellcheck="false" maxlength="30" placeholder="Username (staff only)" style="letter-spacing:1px;text-align:left;padding:0 16px;font-size:16px;margin-bottom:10px">
     <!-- text PIN (letters + numbers), full keyboard on mobile -->
-    <input class="pin-input" id="pinInput" type="text" inputmode="text" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false" maxlength="12" placeholder="Enter password" style="-webkit-text-security:disc;text-security:disc;letter-spacing:4px">
-    <button class="pin-btn" id="pinBtn">Unlock</button>
+    <input class="pin-input" id="pinInput" type="text" inputmode="text" autocapitalize="none" autocorrect="off" autocomplete="current-password" spellcheck="false" maxlength="20" placeholder="Enter password" style="-webkit-text-security:disc;text-security:disc;letter-spacing:4px">
+    <button class="pin-btn" id="pinBtn">Sign In</button>
     <div class="pin-err" id="pinErr"></div>
   </div>
 </div>
@@ -462,7 +463,10 @@ const CONFIG = {
   ],
   storageKey: "hospitalTokenData",
   broadcastChannel: "hospital-token-channel",
-  adminPassword: "Amal123"
+  adminPassword: "Amal123",
+  // Front-office staff login: limited to Dashboard + Registrations
+  staffUser: "flydubai",
+  staffPassword: "flydubai@1234"
 };
 
 const DEFAULT_PURPOSES = CONFIG.purposes.slice();   // fallback issue-type list
@@ -634,17 +638,49 @@ function op(name, extra){
   });
 }
 
-/* ---- PIN ---- */
+/* ---- Login (role-based access) ---- */
 const pinLock = document.getElementById('pinLock');
-function unlock(){ pinLock.style.display='none'; document.getElementById('app').style.display='flex'; boot(); }
-if (sessionStorage.getItem('adminUnlocked')==='1') unlock();
+// Tabs each role may open. Staff (front office) only get dashboard + registrations.
+const ROLE_TABS = { admin: ['dashboard','registrations','feedback','settings'], staff: ['dashboard','registrations'] };
+function applyRole(role){
+  const allowed = ROLE_TABS[role] || ROLE_TABS.staff;
+  document.querySelectorAll('.nav-item[data-tab]').forEach(it => {
+    it.style.display = allowed.includes(it.dataset.tab) ? '' : 'none';
+  });
+  // If the current tab isn't allowed for this role, fall back to Dashboard.
+  const activeTab = document.querySelector('.nav-item.active');
+  if (!activeTab || !allowed.includes(activeTab.dataset.tab)) {
+    const dash = document.querySelector('.nav-item[data-tab="dashboard"]');
+    if (dash) dash.click();
+  }
+}
+function unlock(role){
+  pinLock.style.display='none';
+  document.getElementById('app').style.display='flex';
+  boot();
+  applyRole(role);
+}
+const savedRole = sessionStorage.getItem('adminRole');
+if (sessionStorage.getItem('adminUnlocked')==='1' && savedRole) unlock(savedRole);
 document.getElementById('pinBtn').onclick = tryPin;
 document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key==='Enter') tryPin(); });
-document.getElementById('pinInput').focus();
+document.getElementById('userInput').addEventListener('keydown', e => { if (e.key==='Enter') tryPin(); });
+document.getElementById('userInput').focus();
 function tryPin(){
-  const v = document.getElementById('pinInput').value;
-  if (v === CONFIG.adminPassword) { sessionStorage.setItem('adminUnlocked','1'); unlock(); }
-  else { document.getElementById('pinErr').textContent='Incorrect PIN. Try again.'; document.getElementById('pinInput').value=''; document.getElementById('pinInput').focus(); }
+  const user = document.getElementById('userInput').value.trim();
+  const pass = document.getElementById('pinInput').value;
+  let role = null;
+  if (!user && pass === CONFIG.adminPassword) role = 'admin';
+  else if (user.toLowerCase() === CONFIG.staffUser.toLowerCase() && pass === CONFIG.staffPassword) role = 'staff';
+  if (role){
+    sessionStorage.setItem('adminUnlocked','1');
+    sessionStorage.setItem('adminRole', role);
+    unlock(role);
+  } else {
+    document.getElementById('pinErr').textContent='Incorrect username or password.';
+    document.getElementById('pinInput').value='';
+    document.getElementById('pinInput').focus();
+  }
 }
 
 /* ---- Sound (Web Audio 3-tone chime) ---- */
