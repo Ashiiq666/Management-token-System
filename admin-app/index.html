@@ -649,6 +649,9 @@ function applyRole(role){
   document.querySelectorAll('.nav-item[data-tab]').forEach(it => {
     it.style.display = allowed.includes(it.dataset.tab) ? '' : 'none';
   });
+  // Staff can't export data.
+  const exportBtn = document.getElementById('exportBtn');
+  if (exportBtn) exportBtn.style.display = (role === 'admin') ? '' : 'none';
   // If the current tab isn't allowed for this role, fall back to Dashboard.
   const activeTab = document.querySelector('.nav-item.active');
   if (!activeTab || !allowed.includes(activeTab.dataset.tab)) {
