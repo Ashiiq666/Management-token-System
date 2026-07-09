@@ -380,7 +380,7 @@ td .tok { font-weight: 800; color: var(--brand); }
           <button class="btn btn-success" id="savePurposesBtn"><i class="ti ti-check"></i> Save Issue Types</button>
         </div>
       </div>
-      <div class="settings-card">
+      <div class="settings-card" data-staff="1">
         <h3>Break Time (per counter)</h3>
         <p>Set a daily break window for each counter. The display shows it in advance, then switches that counter to a break notice during the window. Each counter is independent.</p>
         <div id="breakEditor"></div>
@@ -648,7 +648,7 @@ function op(name, extra){
 /* ---- Login (role-based access) ---- */
 const pinLock = document.getElementById('pinLock');
 // Tabs each role may open. Staff (front office) only get dashboard + registrations.
-const ROLE_TABS = { admin: ['dashboard','registrations','feedback','settings'], staff: ['dashboard','registrations'] };
+const ROLE_TABS = { admin: ['dashboard','registrations','feedback','settings'], staff: ['dashboard','registrations','settings'] };
 function applyRole(role){
   const allowed = ROLE_TABS[role] || ROLE_TABS.staff;
   document.querySelectorAll('.nav-item[data-tab]').forEach(it => {
@@ -657,6 +657,12 @@ function applyRole(role){
   // Staff can't export data.
   const exportBtn = document.getElementById('exportBtn');
   if (exportBtn) exportBtn.style.display = (role === 'admin') ? '' : 'none';
+  // In Settings, staff see only the Break Time card; admins see everything.
+  document.querySelectorAll('#tab-settings .settings-card').forEach(card => {
+    card.style.display = (role === 'admin' || card.dataset.staff === '1') ? '' : 'none';
+  });
+  const settingsSub = document.querySelector('#tab-settings .page-sub');
+  if (settingsSub) settingsSub.textContent = (role === 'admin') ? 'Configure the system.' : 'Manage break time.';
   // If the current tab isn't allowed for this role, fall back to Dashboard.
   const activeTab = document.querySelector('.nav-item.active');
   if (!activeTab || !allowed.includes(activeTab.dataset.tab)) {
