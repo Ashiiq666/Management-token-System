@@ -209,7 +209,14 @@ function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date());
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function toServingMap(v){ if(!v||typeof v!=='object') return {}; const o={}; if(Array.isArray(v)){ v.forEach((val,i)=>{ if(val!=null) o[i]=val; }); } else { Object.keys(v).forEach(k=>{ if(v[k]!=null) o[k]=v[k]; }); } return o; }
 function normalize(s){
-  if(!s || s.date !== localDay()) return { date:localDay(), seq:1, nextNormal:6, counters:1, tokens:[], queue:[], pending:[], vip:[], serving:{}, servedCount:0, hospitalName:(s&&s.hospitalName)||CONFIG.hospitalName };
+  if(!s || s.date !== localDay()){
+    const p = s || {};
+    const ns = { date:localDay(), seq:1, nextNormal:6, counters:p.counters||1, tokens:[], queue:[], pending:[], vip:[], serving:{}, servedCount:0, hospitalName:p.hospitalName||CONFIG.hospitalName };
+    if(p.purposes) ns.purposes = p.purposes;
+    if(p.breaks) ns.breaks = p.breaks;
+    if(p.announce) ns.announce = p.announce;
+    return ns;
+  }
   s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending); s.vip=toArr(s.vip);
   s.counters = s.counters || 1;
   s.serving = toServingMap(s.serving);

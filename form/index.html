@@ -383,11 +383,20 @@ const stateRef = firebase.database().ref('state');
 function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date()); }
 function localTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}); }
 // VIP token numbers 1–5 are reserved; normal tokens start at 6.
-function freshState(name){ return { date: localDay(), seq:1, nextNormal:6, tokens:[], queue:[], pending:[], vip:[], currentToken:null, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
+// A new day resets tokens but PRESERVES configuration (name, issue types, counters, breaks, voice).
+function freshState(prev){
+  const p = prev || {};
+  const s = { date: localDay(), seq:1, nextNormal:6, tokens:[], queue:[], pending:[], vip:[], currentToken:null, servedCount:0, hospitalName: p.hospitalName || CONFIG.hospitalName };
+  if(p.purposes) s.purposes = p.purposes;
+  if(p.counters) s.counters = p.counters;
+  if(p.breaks) s.breaks = p.breaks;
+  if(p.announce) s.announce = p.announce;
+  return s;
+}
 // Firebase can return arrays as objects (with integer keys) — coerce back to a real array.
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 function normalize(s){
-  if(!s || s.date !== localDay()) return freshState(s && s.hospitalName);
+  if(!s || s.date !== localDay()) return freshState(s);
   s.tokens = toArr(s.tokens); s.queue = toArr(s.queue); s.pending = toArr(s.pending); s.vip = toArr(s.vip);
   if(s.currentToken === undefined) s.currentToken = null;
   s.seq = s.seq || s.nextId || (s.tokens.length ? Math.max(...s.tokens.map(t=>t.id))+1 : 1);

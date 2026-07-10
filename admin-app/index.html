@@ -481,7 +481,15 @@ const stateRef = firebase.database().ref('state');
 function localDay(){ return new Intl.DateTimeFormat('en-CA').format(new Date()); }
 function localTime(){ return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}); }
 // VIP token numbers 1–5 are reserved (assigned 1→5 in order, never reused); normal tokens start at 6.
-function freshState(name, counters){ return { date: localDay(), seq:1, nextNormal:6, nextVip:1, counters: counters||1, tokens:[], queue:[], pending:[], vip:[], serving:{}, servedCount:0, hospitalName: name || CONFIG.hospitalName }; }
+// A new day resets tokens but PRESERVES configuration (name, counters, issue types, breaks, voice).
+function freshState(prev){
+  const p = prev || {};
+  const s = { date: localDay(), seq:1, nextNormal:6, nextVip:1, counters: p.counters||1, tokens:[], queue:[], pending:[], vip:[], serving:{}, servedCount:0, hospitalName: p.hospitalName || CONFIG.hospitalName };
+  if(p.purposes) s.purposes = p.purposes;
+  if(p.breaks) s.breaks = p.breaks;
+  if(p.announce) s.announce = p.announce;
+  return s;
+}
 // Firebase can return arrays as objects (with integer keys) — coerce back to a real array.
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
 // Firebase stores {1:id,2:id} as an array [null,id,id]; coerce back to a counter→id map.
@@ -493,7 +501,7 @@ function toServingMap(v){
   return o;
 }
 function normalize(s){
-  if(!s || s.date !== localDay()) return freshState(s && s.hospitalName, s && s.counters);
+  if(!s || s.date !== localDay()) return freshState(s);
   s.tokens=toArr(s.tokens); s.queue=toArr(s.queue); s.pending=toArr(s.pending); s.vip=toArr(s.vip);
   s.counters = s.counters || 1;
   s.serving = toServingMap(s.serving);
@@ -630,7 +638,7 @@ function applyOp(s, op, d){
     s.vip = s.vip.filter(x=>x!==d.id);
     if(s.serving){ Object.keys(s.serving).forEach(k=>{ if(s.serving[k]===d.id) s.serving[k]=null; }); }
   } else if(op==='reset'){
-    return freshState(s.hospitalName, s.counters);
+    return freshState(s);
   }
   return s;
 }
