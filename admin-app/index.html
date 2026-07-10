@@ -1257,10 +1257,10 @@ function nextCallGap(t, tokens){
 function fmtDate(t){ const ts=t&&t.registeredTs; return ts ? new Date(ts).toLocaleDateString('en-GB') : ((state&&state.date)||''); }
 function exportCSV(){
   const s = state; if (!s) return;
-  const head = ['Date','Token','VIP Slot','Name','Phone','Purpose','Status','Counter','Registered','Called','Waiting time','Time taken','Type','Complaint'];
+  const head = ['Token','VIP Slot','Name','Phone','Purpose','Status','Counter','Registered','Date','Called','Waiting time','Time taken','Type','Complaint'];
   const rows = s.tokens.map(t=>[
-    fmtDate(t), String(t.no).padStart(2,'0'), t.isVip?('VIP '+t.vipNo):'', t.name, t.phone, purposeLabel(t.purpose), t.status,
-    t.counter||'', t.registeredAt||'', t.calledAt||'', fmtDur((t.calledTs||0)-(t.registeredTs||0)), fmtDur(nextCallGap(t, s.tokens)),
+    String(t.no).padStart(2,'0'), t.isVip?('VIP '+t.vipNo):'', t.name, t.phone, purposeLabel(t.purpose), t.status,
+    t.counter||'', t.registeredAt||'', fmtDate(t), t.calledAt||'', fmtDur((t.calledTs||0)-(t.registeredTs||0)), fmtDur(nextCallGap(t, s.tokens)),
     t.feedbackType||'', (t.feedback||'').replace(/\n/g,' ')
   ]);
   const csv = [head, ...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -1276,8 +1276,8 @@ function printReport(){
     <style>body{font-family:Inter,Arial,sans-serif;padding:30px;color:#0f172a}h1{color:#0e7490}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #e2e8f0;padding:8px;text-align:left;font-size:13px}th{background:#f0f4f8}.s{display:flex;gap:24px;margin:16px 0}.s div{font-size:14px}</style></head><body>
     <h1>${esc(CONFIG.hospitalName)}</h1><p><strong>Daily Token Report</strong> — ${new Date().toDateString()}</p>
     <div class="s"><div>Total: <strong>${s.tokens.length}</strong></div><div>Completed: <strong>${done}</strong></div><div>Pending: <strong>${s.pending.length}</strong></div></div>
-    <table><thead><tr><th>Date</th><th>Token</th><th>Name</th><th>Phone</th><th>Purpose</th><th>Status</th><th>Counter</th><th>Registered</th><th>Called</th><th>Waiting time</th><th>Time taken</th></tr></thead><tbody>
-    ${s.tokens.map(t=>`<tr><td>${esc(fmtDate(t))}</td><td>${esc(tokLabel(t))}</td><td>${esc(t.name)}</td><td>${esc(t.phone)}</td><td>${purposeLabel(t.purpose)}</td><td>${t.status}</td><td>${t.counter||'—'}</td><td>${t.registeredAt||''}</td><td>${t.calledAt||'—'}</td><td>${fmtDur((t.calledTs||0)-(t.registeredTs||0))||'—'}</td><td>${fmtDur(nextCallGap(t, s.tokens))||'—'}</td></tr>`).join('')}
+    <table><thead><tr><th>Token</th><th>Name</th><th>Phone</th><th>Purpose</th><th>Status</th><th>Counter</th><th>Registered</th><th>Date</th><th>Called</th><th>Waiting time</th><th>Time taken</th></tr></thead><tbody>
+    ${s.tokens.map(t=>`<tr><td>${esc(tokLabel(t))}</td><td>${esc(t.name)}</td><td>${esc(t.phone)}</td><td>${purposeLabel(t.purpose)}</td><td>${t.status}</td><td>${t.counter||'—'}</td><td>${t.registeredAt||''}</td><td>${esc(fmtDate(t))}</td><td>${t.calledAt||'—'}</td><td>${fmtDur((t.calledTs||0)-(t.registeredTs||0))||'—'}</td><td>${fmtDur(nextCallGap(t, s.tokens))||'—'}</td></tr>`).join('')}
     </tbody></table></body></html>`);
   w.document.close(); w.focus(); setTimeout(()=>w.print(), 300);
 }
