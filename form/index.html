@@ -395,6 +395,29 @@ function freshState(prev){
 }
 // Firebase can return arrays as objects (with integer keys) — coerce back to a real array.
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
+
+// --- Registration history: archive the finished day before the daily reset wipes it (kept 30 days). ---
+const historyRef = firebase.database().ref('history');
+function daysAgoStr(n){ const d=new Date(); d.setDate(d.getDate()-n); return new Intl.DateTimeFormat('en-CA').format(d); }
+let _lastArchiveCheck = null;   // avoid re-reading state on every registration within the same day
+async function archiveIfNewDay(){
+  const today = localDay();
+  if(_lastArchiveCheck === today) return;
+  try{
+    const snap = await stateRef.once('value');
+    const cur = snap.val();
+    if(cur && cur.date && cur.date !== today){
+      const toks = toArr(cur.tokens);
+      if(toks.length) await historyRef.child(cur.date).set({ date: cur.date, tokens: toks, savedTs: Date.now() });
+      // prune anything older than 30 days
+      const hs = await historyRef.once('value'); const all = hs.val() || {};
+      const cutoff = daysAgoStr(30); const upd = {};
+      Object.keys(all).forEach(d => { if(d < cutoff) upd[d] = null; });
+      if(Object.keys(upd).length) await historyRef.update(upd);
+    }
+    _lastArchiveCheck = today;
+  }catch(e){}
+}
 function normalize(s){
   if(!s || s.date !== localDay()) return freshState(s);
   s.tokens = toArr(s.tokens); s.queue = toArr(s.queue); s.pending = toArr(s.pending); s.vip = toArr(s.vip);
@@ -430,8 +453,9 @@ function tick() { document.getElementById('clock').textContent = localTime(); }
 tick(); setInterval(tick, 1000);
 
 /* ---------- Register a complaint (atomic Firebase transaction) ---------- */
-function registerComplaint(payload) {
+async function registerComplaint(payload) {
   const cuid = 'c' + Date.now() + '-' + Math.floor(Math.random() * 1e6);
+  await archiveIfNewDay();   // preserve yesterday's data before the reset that this registration may trigger
   return new Promise((resolve, reject) => {
     stateRef.transaction(cur => {
       const s = normalize(cur);

@@ -436,6 +436,22 @@ td .tok { font-weight: 800; color: var(--brand); }
         <button class="btn btn-ghost" id="printBtn"><i class="ti ti-printer"></i> Print Today's Report</button>
       </div>
       <div class="settings-card">
+        <h3>Registration History (last 30 days)</h3>
+        <p>Registrations are kept for 30 days. Pick a date to view that day's records and export them.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Date</label>
+            <input type="date" id="histDate" style="height:42px;padding:0 12px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);border-radius:var(--radius-md);font-size:14px;font-family:inherit">
+          </div>
+          <button class="btn btn-ghost" id="histLoadBtn"><i class="ti ti-search"></i> Load</button>
+        </div>
+        <div id="histInfo" style="margin-top:12px;font-size:14px;color:var(--text-secondary)"></div>
+        <div id="histActions" style="display:none;gap:10px;margin-top:12px">
+          <button class="btn btn-success" id="histCsvBtn"><i class="ti ti-download"></i> Export CSV</button>
+          <button class="btn btn-ghost" id="histPrintBtn"><i class="ti ti-printer"></i> Print</button>
+        </div>
+      </div>
+      <div class="settings-card">
         <h3 style="color:var(--danger)">Danger Zone</h3>
         <p>Clear all of today's tokens and start fresh.</p>
         <button class="btn btn-danger" id="resetBtn"><i class="ti ti-trash"></i> Reset Today's Data</button>
@@ -492,6 +508,28 @@ function freshState(prev){
 }
 // Firebase can return arrays as objects (with integer keys) — coerce back to a real array.
 function toArr(v){ return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]) : []); }
+
+// --- Registration history: archive the finished day before the daily reset wipes it (kept 30 days). ---
+const historyRef = firebase.database().ref('history');
+function daysAgoStr(n){ const d=new Date(); d.setDate(d.getDate()-n); return new Intl.DateTimeFormat('en-CA').format(d); }
+let _lastArchiveCheck = null;   // avoid re-reading state on every action within the same day
+async function archiveIfNewDay(){
+  const today = localDay();
+  if(_lastArchiveCheck === today) return;
+  try{
+    const snap = await stateRef.once('value');
+    const cur = snap.val();
+    if(cur && cur.date && cur.date !== today){
+      const toks = toArr(cur.tokens);
+      if(toks.length) await historyRef.child(cur.date).set({ date: cur.date, tokens: toks, savedTs: Date.now() });
+      const hs = await historyRef.once('value'); const all = hs.val() || {};
+      const cutoff = daysAgoStr(30); const upd = {};
+      Object.keys(all).forEach(d => { if(d < cutoff) upd[d] = null; });
+      if(Object.keys(upd).length) await historyRef.update(upd);
+    }
+    _lastArchiveCheck = today;
+  }catch(e){}
+}
 // Firebase stores {1:id,2:id} as an array [null,id,id]; coerce back to a counter→id map.
 function toServingMap(v){
   if(!v || typeof v!=='object') return {};
@@ -643,7 +681,8 @@ function applyOp(s, op, d){
   return s;
 }
 // Run an action as an atomic Firebase transaction. Resolves the new state, or null on failure.
-function op(name, extra){
+async function op(name, extra){
+  await archiveIfNewDay();   // never let a reset destroy yesterday's data unarchived
   return new Promise(resolve => {
     stateRef.transaction(cur => applyOp(normalize(cur), name, extra || {}),
       (err, committed, snap) => {
@@ -729,6 +768,7 @@ function chime(){
 let nameInitialized = false;
 function boot(){
   buildPurposeFilter();
+  archiveIfNewDay();   // archive on open, in case the admin is left running across midnight
   // Live, instant updates straight from Firebase (no polling)
   stateRef.on('value', snap => {
     state = normalize(snap.val());
@@ -1230,6 +1270,14 @@ document.getElementById('printQrBtn').onclick = () => {
   w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400);
 };
 document.getElementById('printBtn').onclick = () => printReport();
+// Registration history controls
+(function(){
+  const d = document.getElementById('histDate');
+  if(d){ d.max = localDay(); d.min = daysAgoStr(30); d.value = localDay(); }
+  document.getElementById('histLoadBtn').onclick = () => loadHistory();
+  document.getElementById('histCsvBtn').onclick = () => { if(histLoaded.tokens.length) downloadTokensCSV(histLoaded.tokens, `registrations-${histLoaded.date}.csv`); };
+  document.getElementById('histPrintBtn').onclick = () => { if(histLoaded.tokens.length) printTokens(histLoaded.tokens, histLoaded.date); };
+})();
 document.getElementById('resetBtn').onclick = () => {
   showModal(`<h3>Reset today's data?</h3><p>This permanently deletes all tokens, queue, and feedback for today. This cannot be undone.</p>
     <div class="modal-actions"><button class="btn btn-ghost" id="rc">Cancel</button><button class="btn btn-danger" id="rok"><i class="ti ti-trash"></i> Reset</button></div>`);
@@ -1255,31 +1303,54 @@ function nextCallGap(t, tokens){
   return next===null ? 0 : next-t.calledTs;
 }
 function fmtDate(t){ const ts=t&&t.registeredTs; return ts ? new Date(ts).toLocaleDateString('en-GB') : ((state&&state.date)||''); }
-function exportCSV(){
-  const s = state; if (!s) return;
+// Build & download a CSV for any token list (today's live tokens or an archived day).
+function downloadTokensCSV(tokens, filename){
   const head = ['Token','VIP Slot','Name','Phone','Purpose','Status','Counter','Registered','Date','Called','Waiting time','Time taken','Type','Complaint'];
-  const rows = s.tokens.map(t=>[
+  const rows = tokens.map(t=>[
     String(t.no).padStart(2,'0'), t.isVip?('VIP '+t.vipNo):'', t.name, t.phone, purposeLabel(t.purpose), t.status,
-    t.counter||'', t.registeredAt||'', fmtDate(t), t.calledAt||'', fmtDur((t.calledTs||0)-(t.registeredTs||0)), fmtDur(nextCallGap(t, s.tokens)),
+    t.counter||'', t.registeredAt||'', fmtDate(t), t.calledAt||'', fmtDur((t.calledTs||0)-(t.registeredTs||0)), fmtDur(nextCallGap(t, tokens)),
     t.feedbackType||'', (t.feedback||'').replace(/\n/g,' ')
   ]);
   const csv = [head, ...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob([csv],{type:'text/csv'}); const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob); a.download=`tokens-${todayStr()}.csv`; a.click();
+  a.href=URL.createObjectURL(blob); a.download=filename; a.click();
   toast('CSV exported');
 }
-function printReport(){
-  const s = state; if (!s) return;
-  const done = s.tokens.filter(t=>t.status==='done').length;
+// Open a printable report for any token list.
+function printTokens(tokens, dateLabel){
+  const done = tokens.filter(t=>t.status==='done').length;
   const w = window.open('','_blank');
-  w.document.write(`<html><head><title>Report ${todayStr()}</title>
+  w.document.write(`<html><head><title>Report ${esc(dateLabel)}</title>
     <style>body{font-family:Inter,Arial,sans-serif;padding:30px;color:#0f172a}h1{color:#0e7490}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #e2e8f0;padding:8px;text-align:left;font-size:13px}th{background:#f0f4f8}.s{display:flex;gap:24px;margin:16px 0}.s div{font-size:14px}</style></head><body>
-    <h1>${esc(CONFIG.hospitalName)}</h1><p><strong>Daily Token Report</strong> — ${new Date().toDateString()}</p>
-    <div class="s"><div>Total: <strong>${s.tokens.length}</strong></div><div>Completed: <strong>${done}</strong></div><div>Pending: <strong>${s.pending.length}</strong></div></div>
+    <h1>${esc(CONFIG.hospitalName)}</h1><p><strong>Registration Report</strong> — ${esc(dateLabel)}</p>
+    <div class="s"><div>Total: <strong>${tokens.length}</strong></div><div>Completed: <strong>${done}</strong></div></div>
     <table><thead><tr><th>Token</th><th>Name</th><th>Phone</th><th>Purpose</th><th>Status</th><th>Counter</th><th>Registered</th><th>Date</th><th>Called</th><th>Waiting time</th><th>Time taken</th></tr></thead><tbody>
-    ${s.tokens.map(t=>`<tr><td>${esc(tokLabel(t))}</td><td>${esc(t.name)}</td><td>${esc(t.phone)}</td><td>${purposeLabel(t.purpose)}</td><td>${t.status}</td><td>${t.counter||'—'}</td><td>${t.registeredAt||''}</td><td>${esc(fmtDate(t))}</td><td>${t.calledAt||'—'}</td><td>${fmtDur((t.calledTs||0)-(t.registeredTs||0))||'—'}</td><td>${fmtDur(nextCallGap(t, s.tokens))||'—'}</td></tr>`).join('')}
+    ${tokens.map(t=>`<tr><td>${esc(tokLabel(t))}</td><td>${esc(t.name)}</td><td>${esc(t.phone)}</td><td>${purposeLabel(t.purpose)}</td><td>${t.status}</td><td>${t.counter||'—'}</td><td>${t.registeredAt||''}</td><td>${esc(fmtDate(t))}</td><td>${t.calledAt||'—'}</td><td>${fmtDur((t.calledTs||0)-(t.registeredTs||0))||'—'}</td><td>${fmtDur(nextCallGap(t, tokens))||'—'}</td></tr>`).join('')}
     </tbody></table></body></html>`);
   w.document.close(); w.focus(); setTimeout(()=>w.print(), 300);
+}
+function exportCSV(){ const s = state; if (!s) return; downloadTokensCSV(toArr(s.tokens), `registrations-${todayStr()}.csv`); }
+function printReport(){ const s = state; if (!s) return; printTokens(toArr(s.tokens), new Date().toDateString()); }
+
+/* ---- Registration history (last 30 days): load a date, then export/print ---- */
+async function historyTokensFor(date){
+  if(date === localDay()) return toArr(state && state.tokens);   // today = live data
+  const snap = await historyRef.child(date).once('value');
+  const v = snap.val();
+  return v ? toArr(v.tokens) : [];
+}
+let histLoaded = { date:null, tokens:[] };
+async function loadHistory(){
+  const date = document.getElementById('histDate').value;
+  if(!date){ toast('Pick a date'); return; }
+  const tokens = await historyTokensFor(date);
+  histLoaded = { date, tokens };
+  const info = document.getElementById('histInfo');
+  const done = tokens.filter(t=>t.status==='done').length;
+  info.innerHTML = tokens.length
+    ? `<strong>${tokens.length}</strong> registrations on <strong>${date}</strong> (${done} completed).`
+    : `No registrations found for <strong>${date}</strong>.`;
+  document.getElementById('histActions').style.display = tokens.length ? 'flex' : 'none';
 }
 
 /* ---- Modal/toast ---- */
