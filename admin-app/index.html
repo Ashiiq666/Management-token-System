@@ -432,16 +432,11 @@ td .tok { font-weight: 800; color: var(--brand); }
         </div>
       </div>
       <div class="settings-card">
-        <h3>Daily Report</h3>
-        <p>Print a summary of today's activity.</p>
-        <button class="btn btn-ghost" id="printBtn"><i class="ti ti-printer"></i> Print Today's Report</button>
-      </div>
-      <div class="settings-card">
-        <h3>Registration History (last 30 days)</h3>
-        <p>Registrations are kept for 30 days. Pick a date to view that day's records and export them.</p>
+        <h3>Reports &amp; History (last 30 days)</h3>
+        <p>Registrations are kept for 30 days. Export or print a single day (pick today for today's report) or the whole month.</p>
+        <label style="display:block;font-size:12px;font-weight:700;margin-bottom:6px">By date</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
           <div>
-            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Date</label>
             <input type="date" id="histDate" style="height:42px;padding:0 12px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);border-radius:var(--radius-md);font-size:14px;font-family:inherit">
           </div>
           <button class="btn btn-ghost" id="histLoadBtn"><i class="ti ti-search"></i> Load</button>
@@ -450,6 +445,12 @@ td .tok { font-weight: 800; color: var(--brand); }
         <div id="histActions" style="display:none;gap:10px;margin-top:12px">
           <button class="btn btn-success" id="histCsvBtn"><i class="ti ti-download"></i> Export CSV</button>
           <button class="btn btn-ghost" id="histPrintBtn"><i class="ti ti-printer"></i> Print</button>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+        <label style="display:block;font-size:12px;font-weight:700;margin-bottom:6px">Whole month (<span id="monthLbl"></span>)</label>
+        <div id="monthActions" style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-success" id="monthCsvBtn"><i class="ti ti-download"></i> Export Month CSV</button>
+          <button class="btn btn-ghost" id="monthPrintBtn"><i class="ti ti-printer"></i> Print Month</button>
         </div>
       </div>
       <div class="settings-card">
@@ -1288,14 +1289,17 @@ document.getElementById('printQrBtn').onclick = () => {
   </body></html>`);
   w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400);
 };
-document.getElementById('printBtn').onclick = () => printReport();
-// Registration history controls
+// Reports & history controls (single day + whole month)
 (function(){
   const d = document.getElementById('histDate');
   if(d){ d.max = localDay(); d.min = daysAgoStr(30); d.value = localDay(); }
+  const prefix = localDay().slice(0,7);
+  const ml = document.getElementById('monthLbl'); if(ml) ml.textContent = prefix;
   document.getElementById('histLoadBtn').onclick = () => loadHistory();
   document.getElementById('histCsvBtn').onclick = () => { if(histLoaded.tokens.length) downloadTokensCSV(histLoaded.tokens, `registrations-${histLoaded.date}.csv`); };
   document.getElementById('histPrintBtn').onclick = () => { if(histLoaded.tokens.length) printTokens(histLoaded.tokens, histLoaded.date); };
+  document.getElementById('monthCsvBtn').onclick = async () => { const t = await monthTokens(); if(!t.length){ toast('No registrations this month'); return; } downloadTokensCSV(t, `registrations-${prefix}.csv`); };
+  document.getElementById('monthPrintBtn').onclick = async () => { const t = await monthTokens(); if(!t.length){ toast('No registrations this month'); return; } printTokens(t, prefix+' (whole month)'); };
 })();
 document.getElementById('resetBtn').onclick = () => {
   showModal(`<h3>Reset today's data?</h3><p>This permanently deletes all tokens, queue, and feedback for today. This cannot be undone.</p>
@@ -1357,6 +1361,14 @@ async function historyTokensFor(date){
   const snap = await historyRef.child(date).once('value');
   const v = snap.val();
   return v ? toArr(v.tokens) : [];
+}
+// All registrations for the current month = archived days this month + today's live tokens.
+async function monthTokens(){
+  const prefix = localDay().slice(0,7);
+  const snap = await historyRef.once('value'); const all = snap.val() || {};
+  let toks = [];
+  Object.keys(all).sort().forEach(d => { if(d.startsWith(prefix) && d !== localDay()) toks = toks.concat(toArr(all[d].tokens)); });
+  return toks.concat(toArr(state && state.tokens));   // today last
 }
 let histLoaded = { date:null, tokens:[] };
 async function loadHistory(){
