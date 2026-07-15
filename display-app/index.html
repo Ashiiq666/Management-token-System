@@ -107,7 +107,7 @@ header {
 /* Right — compact Up Next + stats (≈25% width) */
 .right { width:25%; min-width:240px; border-left:1px solid var(--border); display:flex; flex-direction:column; background:var(--panel); }
 .section-lbl { font-size:16px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--muted); padding:20px 22px 12px; display:flex; align-items:center; gap:8px; }
-.upnext-list { flex:1; padding:0 18px; display:flex; flex-direction:column; gap:12px; overflow:hidden; }
+.upnext-list { flex:1; padding:0 18px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; min-height:0; }
 .up-card {
   background:var(--panel2); border:1px solid var(--border); border-radius:16px;
   padding:14px 16px; display:flex; align-items:center; gap:14px; animation: slideUp .45s ease;
@@ -411,12 +411,11 @@ function render(s){
   applyAnnounceCfg(s);
   renderServe(s);
 
-  // up next (3)
+  // up next (all waiting)
   const list = document.getElementById('upnextList');
-  const upcoming = s.queue.slice(0,3);
+  const upcoming = s.queue.map(id => s.tokens.find(x=>x.id===id)).filter(Boolean);
   if (!upcoming.length) list.innerHTML = `<div class="up-empty">No one waiting</div>`;
-  else list.innerHTML = upcoming.map((id,i)=>{
-    const t = s.tokens.find(x=>x.id===id);
+  else list.innerHTML = upcoming.map((t,i)=>{
     return `<div class="up-card ${i===0?'first':''}">
       <div class="up-num">${pad(t.no)}</div>
       <div class="up-info"><div class="nm">${esc(t.name)}</div></div>
